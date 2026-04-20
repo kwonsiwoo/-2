@@ -35,6 +35,7 @@ export const getOdsayTransitRoutes = async (
   const url = isDev
     ? `${BASE}/searchPubTransPathT?SX=${startCoords.lon}&SY=${startCoords.lat}&EX=${endCoords.lon}&EY=${endCoords.lat}&apiKey=${import.meta.env.VITE_ODSAY_API_KEY || ''}`
     : `/api/odsay?SX=${startCoords.lon}&SY=${startCoords.lat}&EX=${endCoords.lon}&EY=${endCoords.lat}`;
+  console.log('ODsay 호출 URL:', url.startsWith('/api') ? '[프록시]' : '[직접]', isDev ? 'dev' : 'prod');
   const res = await fetch(url);
   const data = await res.json();
 
