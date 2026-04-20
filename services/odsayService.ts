@@ -36,15 +36,18 @@ export const getOdsayTransitRoutes = async (
   const res = await fetch(url);
   const data = await res.json();
 
-  console.log('ODsay 경로 탐색 응답:', data);
+  console.log('ODsay 경로 탐색 응답:', JSON.stringify(data).slice(0, 300));
 
   if (data.error) {
-    throw new Error(`ODsay 오류: ${data.error.message || data.error}`);
+    const msg = data.error.message || data.error.msg || JSON.stringify(data.error);
+    throw new Error(`ODsay 오류: ${msg}`);
   }
 
   const paths = data.result?.path;
   if (!paths || paths.length === 0) {
-    throw new Error('경로를 찾을 수 없습니다.');
+    // ODsay는 경로 없을 때 result 자체가 없거나 path가 빈 배열
+    const status = data.result?.status ?? data.result;
+    throw new Error(`경로를 찾을 수 없습니다. (status: ${JSON.stringify(status)})`);
   }
 
   const fullTaxiCost = 35000;
