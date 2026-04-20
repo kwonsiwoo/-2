@@ -6,7 +6,9 @@ const BASE = 'https://api.odsay.com/v1/api';
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { SX, SY, EX, EY } = req.query as Record<string, string>;
 
-  console.log('ODSAY_API_KEY 존재:', !!API_KEY, '길이:', API_KEY.length);
+  if (!API_KEY) {
+    return res.status(500).json({ error: [{ code: 'NO_KEY', message: 'ODSAY_API_KEY 환경변수가 설정되지 않았습니다' }] });
+  }
   try {
     const url = `${BASE}/searchPubTransPathT?SX=${SX}&SY=${SY}&EX=${EX}&EY=${EY}&apiKey=${API_KEY}`;
     const r = await fetch(url);
