@@ -1,7 +1,6 @@
 import { HybridRoute, RouteSegment } from '../types';
 import { getCoordinates } from './tmapService';
 
-const API_KEY = import.meta.env.VITE_ODSAY_API_KEY || '';
 const BASE = 'https://api.odsay.com/v1/api';
 
 // trafficType: 1=지하철, 2=버스, 3=도보
@@ -32,7 +31,10 @@ export const getOdsayTransitRoutes = async (
   }
 
   // 2. ODsay 경로 탐색
-  const url = `${BASE}/searchPubTransPathT?SX=${startCoords.lon}&SY=${startCoords.lat}&EX=${endCoords.lon}&EY=${endCoords.lat}&apiKey=${API_KEY}`;
+  const isDev = import.meta.env.DEV;
+  const url = isDev
+    ? `${BASE}/searchPubTransPathT?SX=${startCoords.lon}&SY=${startCoords.lat}&EX=${endCoords.lon}&EY=${endCoords.lat}&apiKey=${import.meta.env.VITE_ODSAY_API_KEY || ''}`
+    : `/api/odsay?SX=${startCoords.lon}&SY=${startCoords.lat}&EX=${endCoords.lon}&EY=${endCoords.lat}`;
   const res = await fetch(url);
   const data = await res.json();
 
