@@ -11,7 +11,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   try {
     const url = `${BASE}/searchPubTransPathT?SX=${SX}&SY=${SY}&EX=${EX}&EY=${EY}&apiKey=${API_KEY}`;
-    const r = await fetch(url);
+    // 브라우저의 Referer/Origin을 ODsay에 전달 (도메인 인증 우회)
+    const referer = (req.headers['referer'] || req.headers['origin'] || '') as string;
+    const r = await fetch(url, {
+      headers: {
+        'Referer': referer,
+        'User-Agent': 'Mozilla/5.0',
+      },
+    });
     const data = await r.json();
     res.setHeader('X-Proxy', 'odsay-vercel');
     res.json(data);
