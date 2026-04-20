@@ -1107,8 +1107,14 @@ const App: React.FC = () => {
             </div>
 
             {routes.map((route, index) => {
-                // Pass the index to get specific funny comments for routes 2 and 3
                 const { timeText, comment, urgent } = calculatePlayTime(route.departureTime, index);
+                const arrDate = new Date(Date.now() + route.totalDuration * 60000);
+                const arrH = arrDate.getHours();
+                const arrM = arrDate.getMinutes();
+                const arrStr = `${arrH < 12 ? '오전' : '오후'} ${arrH === 0 ? 12 : arrH > 12 ? arrH - 12 : arrH}:${arrM.toString().padStart(2, '0')}`;
+                const durStr = route.totalDuration >= 60
+                    ? `${Math.floor(route.totalDuration / 60)}시간 ${route.totalDuration % 60 > 0 ? `${route.totalDuration % 60}분` : ''}`
+                    : `${route.totalDuration}분`;
                 
                 return (
                     <div 
@@ -1153,30 +1159,78 @@ const App: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="flex items-center space-x-4 mb-5">
-                                <div className="flex-1">
-                                    <p className="text-xs text-gray-400 mb-1 font-bold">총 비용</p>
-                                    <p className="text-2xl font-black text-gray-800">{route.totalCost.toLocaleString()}원</p>
-                                </div>
-                                <div className="w-0.5 h-10 bg-gray-100"></div>
-                                <div className="flex-1">
-                                    <p className="text-xs text-gray-400 mb-1 font-bold">막차 출발</p>
-                                    <Countdown targetTimeStr={route.departureTime} />
-                                </div>
+                            {/* 총 소요시간 + 도착예정 + 비용 */}
+                            <div className="flex items-center gap-2 mb-4 flex-wrap">
+                                <span className="text-2xl font-black text-gray-800">{durStr}</span>
+                                <span className="text-gray-300 font-bold">|</span>
+                                <span className="text-sm text-gray-500 font-bold">{arrStr} 도착예정</span>
+                                <span className="text-gray-300 font-bold">|</span>
+                                <span className="text-sm font-black text-brandBlue">{route.totalCost.toLocaleString()}원</span>
                             </div>
 
-                            <div className="w-full h-3 bg-gray-100 rounded-full flex overflow-hidden">
-                                {route.segments.map((seg, idx) => (
-                                    <div 
-                                        key={idx} 
-                                        className={`h-full ${
-                                            seg.type === 'walk' ? 'bg-gray-400' :
-                                            seg.type === 'taxi' ? 'bg-brandYellow' :
-                                            seg.type === 'subway' ? 'bg-brandMint' : 'bg-brandBlue'
-                                        }`}
-                                        style={{ flex: seg.durationMinutes }}
-                                    ></div>
-                                ))}
+                            {/* 수단별 소요시간 바 */}
+                            <div className="flex items-stretch rounded-xl overflow-hidden gap-px mb-4">
+                                {route.segments.map((seg, idx) => {
+                                    const isSubway = seg.type === 'subway';
+                                    const isBus = seg.type === 'bus';
+                                    const icon = isSubway ? '🚇' : isBus ? '🚌' : '🚶';
+                                    const showLabel = seg.durationMinutes >= 4;
+                                    const isWalk = seg.type === 'walk';
+
+                                    const getSubwayColor = (name: string): string => {
+                                        const n = name || '';
+                                        if (n.includes('1호선')) return '#0052A4';
+                                        if (n.includes('2호선')) return '#00A84D';
+                                        if (n.includes('3호선')) return '#EF7C1C';
+                                        if (n.includes('4호선')) return '#00A4E3';
+                                        if (n.includes('5호선')) return '#996CAC';
+                                        if (n.includes('6호선')) return '#CD7C2F';
+                                        if (n.includes('7호선')) return '#747F00';
+                                        if (n.includes('8호선')) return '#E6186C';
+                                        if (n.includes('9호선')) return '#BDB092';
+                                        if (n.includes('신분당')) return '#D31145';
+                                        if (n.includes('분당') || n.includes('수인')) return '#F5A200';
+                                        if (n.includes('경의') || n.includes('중앙')) return '#77C4A3';
+                                        if (n.includes('경춘')) return '#0C8E72';
+                                        if (n.includes('경강')) return '#0065B3';
+                                        if (n.includes('공항')) return '#0065B3';
+                                        if (n.includes('GTX')) return '#9C4EA8';
+                                        if (n.includes('용인')) return '#74C043';
+                                        if (n.includes('의정부')) return '#C9AB8B';
+                                        if (n.includes('인천1')) return '#7CA8D5';
+                                        if (n.includes('인천2')) return '#F5A200';
+                                        if (n.includes('우이')) return '#B0CE18';
+                                        if (n.includes('서해')) return '#8FC31F';
+                                        return '#6B7280';
+                                    };
+
+                                    if (isSubway) console.log('subway lineName:', seg.lineName);
+                                    const bgColor = isSubway
+                                        ? getSubwayColor(seg.lineName || '')
+                                        : isBus ? '#3B82F6' : '#D1D5DB';
+                                    const textColor = isWalk ? '#6B7280' : '#ffffff';
+
+                                    return (
+                                        <div
+                                            key={idx}
+                                            className="flex flex-row items-center justify-start gap-0.5 px-1.5 py-1.5 min-w-0 overflow-hidden"
+                                            style={{ flex: Math.max(seg.durationMinutes, 3), backgroundColor: bgColor }}
+                                        >
+                                            <span className="text-xs leading-none shrink-0">{icon}</span>
+                                            {showLabel && (
+                                                <span className="text-[10px] font-black whitespace-nowrap overflow-hidden" style={{ color: textColor }}>
+                                                    {seg.durationMinutes}분
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* 막차 출발 */}
+                            <div>
+                                <p className="text-xs text-gray-400 mb-0.5 font-bold">막차 출발</p>
+                                <Countdown targetTimeStr={route.departureTime} />
                             </div>
                         </div>
                     </div>
@@ -1421,11 +1475,21 @@ const App: React.FC = () => {
                                   <span className="text-xs font-bold text-gray-400">{segment.durationMinutes}분</span>
                               </div>
                               <p className="text-gray-800 font-bold text-lg mb-1">{segment.instruction}</p>
-                              {segment.cost > 0 && (
-                                  <p className="text-sm text-gray-500 font-medium">예상 비용: {segment.cost.toLocaleString()}원</p>
+                              {segment.alightInstruction && (
+                                  <p className="text-gray-500 font-bold text-sm mt-1 flex items-center gap-1">
+                                      <span className="text-gray-400">↓</span>
+                                      {segment.alightInstruction}
+                                  </p>
                               )}
-                              {segment.type === 'subway' && segment.instruction && (
-                                  <RealTimeArrival stationName={segment.instruction.split(' ')[0]} />
+                              {segment.cost > 0 && (
+                                  <p className="text-sm text-gray-500 font-medium mt-1">예상 비용: {segment.cost.toLocaleString()}원</p>
+                              )}
+                              {(segment.type === 'subway' || segment.type === 'bus') && segment.startName && (
+                                  <RealTimeArrival
+                                    type={segment.type}
+                                    stationName={segment.startName}
+                                    lineName={segment.lineName}
+                                  />
                               )}
                           </div>
                       </div>

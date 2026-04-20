@@ -9,66 +9,67 @@ const getTmapKey = (): string => {
     return key;
 };
 
-// 1. 주소를 좌표로 변환하는 함수 (TMAP POI API 활용)
+// 주소에서 검색하기 좋은 키워드 추출
+const extractSearchKeyword = (input: string): string[] => {
+    const candidates: string[] = [input];
+
+    // 괄호 안 역명 추출: "경인로 지하 877 (동수역)" → "동수역"
+    const parenMatch = input.match(/\(([^)]+)\)/);
+    if (parenMatch) candidates.push(parenMatch[1]);
+
+    // "지하" 제거 후 앞부분만: "인천 부평구 경인로 지하 877" → "인천 부평구 경인로"
+    const withoutUnderground = input.replace(/지하\s*\d+/g, '').trim();
+    if (withoutUnderground !== input) candidates.push(withoutUnderground);
+
+    // 역명 패턴 추출: "동수역", "부평역" 등
+    const stationMatch = input.match(/([가-힣]+역)/);
+    if (stationMatch) candidates.push(stationMatch[1]);
+
+    return [...new Set(candidates)]; // 중복 제거
+};
+
+const osmSearch = async (query: string): Promise<{ lat: number, lon: number } | null> => {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1&countrycodes=kr&accept-language=ko`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'JjinMakchaApp/1.0' } });
+    const data = await res.json();
+    if (data?.length > 0) {
+        return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+    }
+    return null;
+};
+
+const tmapSearch = async (query: string): Promise<{ lat: number, lon: number } | null> => {
+    try {
+        const key = (import.meta.env.VITE_TMAP_APP_KEY || '').trim();
+        if (!key) return null;
+        const url = `https://apis.openapi.sk.com/tmap/pois?version=1&searchKeyword=${encodeURIComponent(query)}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=1`;
+        const res = await fetch(url, { headers: { appKey: key, Accept: 'application/json' } });
+        const data = await res.json();
+        const poi = data.searchPoiInfo?.pois?.[0];
+        if (poi) return { lat: parseFloat(poi.frontLat || poi.noorLat), lon: parseFloat(poi.frontLon || poi.noorLon) };
+    } catch {}
+    return null;
+};
+
+// 주소를 좌표로 변환 (여러 전략 순차 시도)
 export const getCoordinates = async (keyword: string): Promise<{ lat: number, lon: number } | null> => {
-    // 1st Try: OSM (Nominatim) API as it doesn't require keys and works stably for Korean stations
-    try {
-        const osmUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(keyword)}&format=json&limit=1`;
-        const osmResponse = await fetch(osmUrl, {
-            headers: {
-                'User-Agent': 'JjinMakchaApp/1.0'
-            }
-        });
-        const osmData = await osmResponse.json();
+    const candidates = extractSearchKeyword(keyword);
+    console.log('geocoding candidates:', candidates);
 
-        if (osmData && osmData.length > 0) {
-            return {
-                lat: parseFloat(osmData[0].lat),
-                lon: parseFloat(osmData[0].lon)
-            };
-        }
-    } catch (osmError) {
-        console.warn("OSM Geocoding failed, falling back to TMAP:", osmError);
+    for (const query of candidates) {
+        // OSM 시도
+        try {
+            const result = await osmSearch(query);
+            if (result) { console.log(`OSM 성공: "${query}"`, result); return result; }
+        } catch {}
+
+        // TMAP POI 시도
+        const tmapResult = await tmapSearch(query);
+        if (tmapResult) { console.log(`TMAP 성공: "${query}"`, tmapResult); return tmapResult; }
     }
 
-    try {
-        const TMAP_APP_KEY = getTmapKey();
-        const url = `https://apis.openapi.sk.com/tmap/pois?version=1&searchKeyword=${encodeURIComponent(keyword)}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=1`;
-
-        const response = await fetch(url, {
-            headers: {
-                'appKey': TMAP_APP_KEY,
-                'Accept': 'application/json'
-            }
-        });
-
-        const data = await response.json();
-
-        // Check for API errors
-        if (data.error) {
-            if (data.error.code === 'INVALID_API_KEY') {
-               console.warn("TMAP App Key가 유효하지 않거나 'TMAP POI(통합) 검색 API' 권한이 없습니다.");
-            } else {
-               console.warn(`POI Search API Error: ${data.error.message || 'Unknown error'}`);
-            }
-            return null;
-        }
-
-        // TMAP POI API 응답 구조 수정
-        if (data.searchPoiInfo?.pois && Array.isArray(data.searchPoiInfo.pois)) {
-            const poi = data.searchPoiInfo.pois[0];
-            if (poi) {
-                return {
-                    lat: parseFloat(poi.frontLat || poi.noorLat),
-                    lon: parseFloat(poi.frontLon || poi.noorLon)
-                };
-            }
-        }
-        return null;
-    } catch (error) {
-        console.error("Geocoding error:", error);
-        return null;
-    }
+    console.error('모든 geocoding 시도 실패:', keyword);
+    return null;
 };
 
 // 2. 대중교통 경로 탐색 함수

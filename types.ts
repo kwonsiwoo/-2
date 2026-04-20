@@ -2,6 +2,7 @@
 export interface RouteSegment {
   type: 'walk' | 'bus' | 'subway' | 'taxi';
   instruction: string;
+  alightInstruction?: string;  // 하차 안내 (버스/지하철)
   durationMinutes: number;
   cost: number;
   departureTime?: string;  // HH:MM

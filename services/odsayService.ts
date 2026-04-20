@@ -55,21 +55,40 @@ export const getOdsayTransitRoutes = async (
     const totalCost = info.payment || info.totalFare || 0;
     const totalDuration = info.totalTime || 0;
 
-    const segments: RouteSegment[] = (path.subPath || []).map((sub: any) => {
-      const type = toSegmentType(sub.trafficType);
-      const duration = sub.sectionTime || 0;
+    const rawSegments = (path.subPath || []).map((sub: any) => ({
+      type: toSegmentType(sub.trafficType),
+      duration: sub.sectionTime || 0,
+      lineName: sub.lane?.[0]?.name || sub.lane?.[0]?.busNo || '',
+      busNos: (sub.lane || []).map((l: any) => l.busNo).filter(Boolean).join(', '),
+      startName: sub.startName || '',
+      endName: sub.endName || '',
+      sub,
+    }));
 
-      const lineName = sub.lane?.[0]?.name || sub.lane?.[0]?.busNo || '';
-      const startName = sub.startName || '';
-      const endName = sub.endName || '';
+    // 도보 구간의 빈 역명을 앞뒤 대중교통 구간에서 채움
+    rawSegments.forEach((seg, i) => {
+      if (seg.type === 'walk') {
+        if (!seg.startName && i > 0) seg.startName = rawSegments[i - 1].endName || rawSegments[i - 1].startName;
+        if (!seg.endName && i < rawSegments.length - 1) seg.endName = rawSegments[i + 1].startName || rawSegments[i + 1].endName;
+      }
+    });
 
+    const segments: RouteSegment[] = rawSegments.map(({ type, duration, lineName, busNos, startName, endName, sub }) => {
       let instruction = '';
+      let alightInstruction: string | undefined;
+
       if (type === 'walk') {
-        instruction = `${startName}에서 ${endName}까지 도보`;
+        if (startName && endName) instruction = `${startName}에서 ${endName}까지 도보 이동`;
+        else if (endName) instruction = `${endName}까지 도보 이동`;
+        else if (startName) instruction = `${startName}에서 도보 이동`;
+        else instruction = `도보 이동`;
       } else if (type === 'subway') {
-        instruction = `${startName}역에서 ${lineName} 탑승`;
+        instruction = startName ? `${startName}역 ${lineName} 승차` : `${lineName} 승차`;
+        alightInstruction = endName ? `${endName}역 하차` : undefined;
       } else {
-        instruction = `${startName}에서 ${lineName}번 버스 탑승`;
+        const nos = busNos || lineName;
+        instruction = startName ? `${startName} 정류장 승차 ${nos}` : `${nos} 버스 승차`;
+        alightInstruction = endName ? `${endName} 정류장 하차` : undefined;
       }
 
       // 경로 좌표 (passStopList)
@@ -90,6 +109,7 @@ export const getOdsayTransitRoutes = async (
       return {
         type,
         instruction,
+        alightInstruction,
         durationMinutes: duration,
         cost: 0,
         lineName,

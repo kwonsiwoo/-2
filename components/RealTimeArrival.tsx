@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { getSubwayArrivals, SubwayArrival } from '../services/realtimeService';
-import { getBusArrivals, formatArrtime, BusArrivalInfo } from '../services/tagoService';
+import { getBusArrivals, formatArrtime, formatArrMsg, BusArrivalInfo } from '../services/tagoService';
 
 interface Props {
   type: 'subway' | 'bus';
@@ -106,8 +106,8 @@ const RealTimeArrival: React.FC<Props> = ({ type, stationName, lineName, cityCod
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${tagBg}`}>{item.routeNo}</span>
                   <span className="text-xs text-gray-500">{item.remainStop}정류장 전</span>
                 </div>
-                <span className={`text-xs font-black ${item.arrtime <= 60 ? 'text-brandPink' : 'text-brandBlue'}`}>
-                  {formatArrtime(item.arrtime)}
+                <span className={`text-xs font-black ${(item.arrMsg || '').includes('곧') || item.arrtime <= 60 ? 'text-brandPink' : 'text-brandBlue'}`}>
+                  {item.arrMsg ? formatArrMsg(item.arrMsg) : formatArrtime(item.arrtime)}
                 </span>
               </div>
             ))}
