@@ -25,6 +25,26 @@ export default function Admin() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [diagLog, setDiagLog] = useState<string[]>([]);
+  const [diagLoading, setDiagLoading] = useState(false);
+
+  const runDiag = async () => {
+    setDiagLoading(true);
+    setDiagLog([]);
+    try {
+      const res = await fetch('/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event: 'visit', debug: true }),
+      });
+      const data = await res.json();
+      setDiagLog(data.log ?? [data.error ?? JSON.stringify(data)]);
+    } catch (e: any) {
+      setDiagLog([`네트워크 오류: ${e.message}`]);
+    } finally {
+      setDiagLoading(false);
+    }
+  };
 
   const fetchStats = useCallback(async (pw: string) => {
     setLoading(true);
@@ -128,6 +148,13 @@ export default function Admin() {
             {loading ? '새로고침...' : '새로고침'}
           </button>
           <button
+            onClick={runDiag}
+            disabled={diagLoading}
+            className="px-4 py-2 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 font-bold text-sm rounded-xl transition-colors disabled:opacity-50"
+          >
+            {diagLoading ? '진단 중...' : '🔍 진단'}
+          </button>
+          <button
             onClick={() => { setAuthed(false); setStats(null); setPassword(''); }}
             className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm rounded-xl transition-colors"
           >
@@ -141,6 +168,16 @@ export default function Admin() {
         {error && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
             <p className="text-amber-800 text-sm font-medium break-all">{error}</p>
+          </div>
+        )}
+
+        {/* 진단 결과 */}
+        {diagLog.length > 0 && (
+          <div className="bg-gray-900 rounded-2xl p-5">
+            <p className="text-gray-400 text-xs font-bold mb-2">🔍 진단 결과</p>
+            {diagLog.map((line, i) => (
+              <p key={i} className="text-green-400 text-xs font-mono break-all leading-5">{line}</p>
+            ))}
           </div>
         )}
 
