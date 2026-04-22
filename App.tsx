@@ -183,6 +183,12 @@ const App: React.FC = () => {
   const [placeCategory, setPlaceCategory] = useState<PlaceCategory>('ALL');
   const [placeSort, setPlaceSort] = useState<PlaceSort>('RECOMMEND');
   
+  // Auth State
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loginProvider, setLoginProvider] = useState<string>('');
+  const [showLoginOverlay, setShowLoginOverlay] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+
   // User Settings State
   const [homeAddress, setHomeAddress] = useState('');
   const [isEditingHome, setIsEditingHome] = useState(false);
@@ -499,6 +505,37 @@ const App: React.FC = () => {
       }
   };
 
+  const handleSocialLogin = (provider: 'kakao' | 'naver' | 'google') => {
+    const kakaoClientId  = import.meta.env.VITE_KAKAO_CLIENT_ID;
+    const naverClientId  = import.meta.env.VITE_NAVER_CLIENT_ID;
+    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const redirectUri    = encodeURIComponent(window.location.origin);
+
+    if (provider === 'kakao' && kakaoClientId) {
+      window.location.href = `https://kauth.kakao.com/oauth/authorize?client_id=${kakaoClientId}&redirect_uri=${redirectUri}&response_type=code`;
+      return;
+    }
+    if (provider === 'naver' && naverClientId) {
+      const state = Math.random().toString(36).slice(2);
+      window.location.href = `https://nid.naver.com/oauth2.0/authorize?client_id=${naverClientId}&redirect_uri=${redirectUri}&response_type=code&state=${state}`;
+      return;
+    }
+    if (provider === 'google' && googleClientId) {
+      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${redirectUri}&response_type=code&scope=email%20profile`;
+      return;
+    }
+    // 클라이언트 ID 미설정 시 → 개발 목업 로그인
+    const names: Record<string, string> = { kakao: '카카오', naver: '네이버', google: '구글' };
+    setLoginProvider(names[provider]);
+    setIsLoggedIn(true);
+    setShowLoginOverlay(false);
+  };
+
+  const requireLogin = (action: () => void) => {
+    if (isLoggedIn) action();
+    else setShowLoginPrompt(true);
+  };
+
   const openTaxiApp = (app: 'kakao' | 'ut') => {
       setShowTaxiSelector(false);
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -669,7 +706,19 @@ const App: React.FC = () => {
   }
 
   const renderHome = () => (
-    <div className="flex flex-col h-full px-6 pt-6 pb-20 bg-gradient-to-b from-blue-50 to-white overflow-y-auto">
+    <div className="flex flex-col h-full px-6 pt-6 pb-6 bg-gradient-to-b from-blue-50 to-white overflow-y-auto">
+      {/* 우측 상단 프로필 버튼 */}
+      <div className="flex justify-end mb-2">
+          <button
+              onClick={() => requireLogin(() => setActiveTab('MY_PAGE'))}
+              className="w-10 h-10 rounded-full bg-white border-2 border-gray-100 shadow-sm flex items-center justify-center overflow-hidden hover:scale-105 transition-transform active:scale-95"
+          >
+              {profileImage
+                  ? <img src={profileImage} className="w-full h-full object-cover" alt="프로필" />
+                  : <User size={20} className="text-gray-400" />}
+          </button>
+      </div>
+
       <div className="flex-1 flex flex-col justify-center items-center space-y-8 mt-4">
         <div className="text-center space-y-4">
             <div className="flex justify-center mb-6">
@@ -704,10 +753,10 @@ const App: React.FC = () => {
                     placeholder="어디서 출발해?"
                     className="w-full bg-gray-50 border-2 border-transparent focus:border-brandBlue focus:bg-white rounded-2xl px-5 py-4 text-gray-800 focus:outline-none transition-all placeholder:text-gray-400 font-medium"
                 />
-                <button onClick={() => setPostcodeTarget('start')} className="p-4 bg-gray-50 rounded-2xl text-gray-500 hover:bg-gray-100 transition-colors whitespace-nowrap font-bold text-sm shrink-0">
+                <button onClick={() => requireLogin(() => setPostcodeTarget('start'))} className="p-4 bg-gray-50 rounded-2xl text-gray-500 hover:bg-gray-100 transition-colors whitespace-nowrap font-bold text-sm shrink-0">
                     주소찾기
                 </button>
-                <button onClick={handleUseCurrentLocation} className="p-4 bg-blue-50 rounded-2xl text-brandBlue hover:bg-blue-100 transition-colors shrink-0">
+                <button onClick={() => requireLogin(handleUseCurrentLocation)} className="p-4 bg-blue-50 rounded-2xl text-brandBlue hover:bg-blue-100 transition-colors shrink-0">
                     <MapPin className="w-6 h-6" />
                 </button>
             </div>
@@ -725,15 +774,15 @@ const App: React.FC = () => {
                     placeholder="어디로 갈까?"
                     className="w-full bg-gray-50 border-2 border-transparent focus:border-brandMint focus:bg-white rounded-2xl px-5 py-4 text-gray-800 focus:outline-none transition-all placeholder:text-gray-400 font-medium"
                 />
-                <button onClick={() => setPostcodeTarget('end')} className="p-4 bg-gray-50 rounded-2xl text-gray-500 hover:bg-gray-100 transition-colors whitespace-nowrap font-bold text-sm shrink-0">
+                <button onClick={() => requireLogin(() => setPostcodeTarget('end'))} className="p-4 bg-gray-50 rounded-2xl text-gray-500 hover:bg-gray-100 transition-colors whitespace-nowrap font-bold text-sm shrink-0">
                     주소찾기
                 </button>
             </div>
           </div>
 
           <div className="pt-2">
-             <button 
-                onClick={handleGoHome}
+             <button
+                onClick={() => requireLogin(handleGoHome)}
                 className={`w-full py-3 rounded-2xl text-sm mb-4 border-2 border-dashed transition-all font-bold flex items-center justify-center gap-2 ${homeAddress ? 'bg-blue-50 border-brandBlue text-brandBlue' : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-500'}`}
              >
                 <Home size={16} />
@@ -741,7 +790,7 @@ const App: React.FC = () => {
              </button>
 
             <button
-                onClick={handleSearch}
+                onClick={() => requireLogin(handleSearch)}
                 disabled={isLoading}
                 className="w-full bg-brandBlue text-white font-black text-xl py-5 rounded-2xl shadow-lg shadow-blue-200 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center space-x-3 group"
             >
@@ -810,7 +859,7 @@ const App: React.FC = () => {
       });
 
       return (
-        <div className="flex flex-col h-full bg-gray-50 pb-20">
+        <div className="flex flex-col h-full bg-gray-50">
             <header className="px-6 py-5 sticky top-0 z-20 bg-white/90 backdrop-blur-md shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-2xl font-black text-gray-800">지금 영업중 🌙</h2>
@@ -1003,7 +1052,7 @@ const App: React.FC = () => {
   }
 
   const renderHistory = () => (
-      <div className="flex flex-col h-full bg-gray-50 pb-20">
+      <div className="flex flex-col h-full bg-gray-50">
           <header className="px-6 py-5 flex items-center bg-white sticky top-0 z-20 shadow-sm">
               <h2 className="text-2xl font-black text-gray-800">이용 / 알림 🔔</h2>
           </header>
@@ -1076,9 +1125,12 @@ const App: React.FC = () => {
   );
 
   const renderMyPage = () => (
-    <div className="flex flex-col h-full bg-gray-50 pb-20 relative">
+    <div className="flex flex-col h-full bg-gray-50 pb-6 relative">
         {/* Header */}
-        <header className="px-5 py-4 bg-white sticky top-0 z-20 shadow-sm">
+        <header className="px-5 py-4 bg-white sticky top-0 z-20 shadow-sm flex items-center gap-2">
+            <button onClick={() => setActiveTab('SEARCH')} className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
+                <ChevronLeft size={24} />
+            </button>
             <h2 className="text-xl font-black text-gray-800">내 정보</h2>
         </header>
 
@@ -1177,7 +1229,9 @@ const App: React.FC = () => {
 
                     <div className="mx-5 h-px bg-gray-50" />
 
-                    {/* 안심 귀가 */}
+                    {/* 안심 귀가 — 히든 */}
+                    <div className="hidden">
+                    <div className="mx-5 h-px bg-gray-50" />
                     <button
                         onClick={() => { setIsEditingPhone(true); setTempPhone(emergencyPhone === '010-xxxx-xxxx' ? '' : emergencyPhone); }}
                         className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors active:bg-gray-100"
@@ -1193,6 +1247,7 @@ const App: React.FC = () => {
                         </div>
                         <ChevronRight size={16} className="text-gray-300 shrink-0" />
                     </button>
+                    </div>
                     <div className="pb-2" />
                 </div>
 
@@ -1228,6 +1283,8 @@ const App: React.FC = () => {
                     <div className="px-5 pt-4 pb-2">
                         <p className="text-[11px] font-black text-gray-400 uppercase tracking-wide">앱 정보</p>
                     </div>
+                    {/* 공지사항 — 히든 */}
+                    <div className="hidden">
                     <button onClick={() => setShowMyPageNotices(true)} className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors active:bg-gray-100">
                         <div className="w-10 h-10 rounded-2xl bg-gray-50 flex items-center justify-center shrink-0">
                             <FileText size={18} className="text-gray-400" />
@@ -1238,6 +1295,7 @@ const App: React.FC = () => {
                         <ChevronRight size={16} className="text-gray-300 shrink-0" />
                     </button>
                     <div className="mx-5 h-px bg-gray-50" />
+                    </div>
                     <button onClick={() => setShowCustomerService(true)} className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors active:bg-gray-100">
                         <div className="w-10 h-10 rounded-2xl bg-gray-50 flex items-center justify-center shrink-0">
                             <Phone size={18} className="text-gray-400" />
@@ -1249,6 +1307,15 @@ const App: React.FC = () => {
                     </button>
                     <div className="pb-2" />
                 </div>
+
+                {/* 로그아웃 */}
+                <button
+                    onClick={() => { setIsLoggedIn(false); setLoginProvider(''); }}
+                    className="w-full py-3.5 rounded-2xl bg-gray-100 text-gray-500 font-black text-sm hover:bg-gray-200 transition-colors active:scale-[0.98]"
+                >
+                    로그아웃
+                    {loginProvider ? ` (${loginProvider})` : ''}
+                </button>
 
                 {/* 버전 */}
                 <div className="text-center py-4">
@@ -1486,6 +1553,77 @@ const App: React.FC = () => {
     </div>
   );
 
+  const renderLogin = () => (
+    <div className="flex flex-col h-full px-6 pt-10 pb-8 bg-gradient-to-b from-blue-50 to-white overflow-y-auto">
+
+      {/* 로고 영역 — 메인 화면과 동일한 구조 */}
+      <div className="flex-1 flex flex-col items-center justify-center">
+        <div className="text-center mb-10">
+          <div className="flex justify-center mb-6">
+            <div className="relative w-28 h-28 animate-float">
+              <div className="absolute inset-0 bg-brandBlue/30 rounded-full blur-2xl" />
+              <div className="relative w-full h-full rounded-full border-8 border-white flex items-center justify-center bg-brandBlue shadow-2xl">
+                <Beer className="w-12 h-12 text-white transform -rotate-12" />
+                <div className="absolute top-0 right-0 bg-brandPink text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg transform rotate-12">
+                  막차 구조대
+                </div>
+              </div>
+            </div>
+          </div>
+          <h1 className="text-5xl font-black tracking-tight text-gray-800 drop-shadow-sm">
+            찐<span className="text-brandBlue">막차</span>
+          </h1>
+          <p className="text-gray-500 font-medium mt-3 bg-white px-5 py-2 rounded-full inline-block shadow-sm border border-gray-100">
+            택시비 아껴서 <span className="text-brandPink font-bold">3차</span> 가자! 🍻
+          </p>
+        </div>
+
+        {/* 로그인 카드 — 메인 화면 입력 카드와 동일한 스타일 */}
+        <div className="w-full bg-white p-7 rounded-[2rem] border border-gray-100 shadow-xl space-y-3">
+          <p className="text-center text-sm font-black text-gray-400 mb-4 uppercase tracking-widest">간편 로그인 / 회원가입</p>
+
+          {/* 카카오 */}
+          <button
+            onClick={() => handleSocialLogin('kakao')}
+            className="w-full flex items-center gap-3 bg-[#FEE500] rounded-2xl px-5 py-4 font-black text-gray-900 active:scale-[0.98] transition-all shadow-md shadow-yellow-100 hover:brightness-95"
+          >
+            <div className="w-8 h-8 rounded-xl bg-black/10 flex items-center justify-center shrink-0 text-sm font-black">K</div>
+            <span className="flex-1 text-center text-[15px]">카카오로 시작하기</span>
+          </button>
+
+          {/* 네이버 */}
+          <button
+            onClick={() => handleSocialLogin('naver')}
+            className="w-full flex items-center gap-3 bg-[#03C75A] rounded-2xl px-5 py-4 font-black text-white active:scale-[0.98] transition-all shadow-md shadow-green-100 hover:brightness-95"
+          >
+            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0 text-sm font-black">N</div>
+            <span className="flex-1 text-center text-[15px]">네이버로 시작하기</span>
+          </button>
+
+          {/* 구글 */}
+          <button
+            onClick={() => handleSocialLogin('google')}
+            className="w-full flex items-center gap-3 bg-white border-2 border-gray-100 rounded-2xl px-5 py-4 font-black text-gray-700 active:scale-[0.98] transition-all shadow-md hover:bg-gray-50"
+          >
+            <div className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center shrink-0">
+              <svg width="17" height="17" viewBox="0 0 48 48">
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+              </svg>
+            </div>
+            <span className="flex-1 text-center text-[15px]">구글로 시작하기</span>
+          </button>
+        </div>
+      </div>
+
+      <p className="text-center text-[11px] text-gray-300 font-medium mt-6 leading-relaxed">
+        가입 시 이용약관 및 개인정보처리방침에 동의하게 됩니다.
+      </p>
+    </div>
+  );
+
   const renderLoading = () => (
       <div className="flex flex-col h-full items-center justify-center p-6 space-y-8 text-center bg-blue-50">
           <div className="relative">
@@ -1500,7 +1638,7 @@ const App: React.FC = () => {
   );
 
   const renderResults = () => (
-    <div className="flex flex-col h-full bg-gray-50 pb-20">
+    <div className="flex flex-col h-full bg-gray-50">
         {/* Header: 출발지 → 도착지 + 필터 버튼 */}
         <header className="px-4 py-3 flex items-center gap-2 bg-white/90 backdrop-blur-md sticky top-0 z-20 shadow-sm">
             <button onClick={handleBack} className="p-2 -ml-1 text-gray-400 hover:text-gray-800 rounded-full hover:bg-gray-100 transition-colors shrink-0">
@@ -2101,7 +2239,7 @@ const App: React.FC = () => {
     if (!selectedRoute) return renderResults();
 
     return (
-      <div className="flex flex-col h-full bg-gray-50 pb-20">
+      <div className="flex flex-col h-full bg-gray-50">
         <header className="px-6 py-5 flex items-center bg-white/80 backdrop-blur-md sticky top-0 z-20 shadow-sm">
           <button onClick={handleBack} className="p-2 -ml-2 text-gray-400 hover:text-gray-800 rounded-full hover:bg-gray-100 transition-colors">
             <ChevronLeft className="w-8 h-8" />
@@ -2271,7 +2409,7 @@ const App: React.FC = () => {
     if (!ldtResult) return renderResults();
     const baseMs = ldtResult.latestDepartureMs || Date.now();
     return (
-      <div className="flex flex-col h-full bg-gray-50 pb-20">
+      <div className="flex flex-col h-full bg-gray-50">
         <header className="px-4 py-3 flex items-center gap-2 bg-gradient-to-r from-[#1a1a2e] to-[#0f3460] sticky top-0 z-20 shadow-sm">
           <button onClick={handleBack} className="p-2 -ml-1 text-white/60 hover:text-white rounded-full hover:bg-white/10 transition-colors shrink-0">
             <ChevronLeft className="w-6 h-6" />
@@ -2383,19 +2521,12 @@ const App: React.FC = () => {
       // Priority Check for Open Now Tab content
       if (activeTab === 'OPEN_NOW') return renderOpenNow();
 
-      switch(activeTab) {
-          case 'SEARCH':
-              switch(appState) {
-                  case AppState.HOME: return renderHome();
-                  case AppState.SEARCHING: return renderLoading();
-                  case AppState.RESULTS: return renderResults();
-                  case AppState.DETAILS: return renderDetails();
-                  case AppState.LDT_DETAIL: return renderLdtDetailPage();
-                  case AppState.PLACE_DETAIL: return renderResults(); // Fallback if stuck
-                  default: return renderHome();
-              }
-          case 'HISTORY': return renderHistory();
-          case 'MY_PAGE': return renderMyPage();
+      switch(appState) {
+          case AppState.HOME: return renderHome();
+          case AppState.SEARCHING: return renderLoading();
+          case AppState.RESULTS: return renderResults();
+          case AppState.DETAILS: return renderDetails();
+          case AppState.LDT_DETAIL: return renderLdtDetailPage();
           default: return renderHome();
       }
   };
@@ -2405,50 +2536,63 @@ const App: React.FC = () => {
        <div className="flex-1 overflow-hidden relative">
             {renderContent()}
        </div>
-       
-       {/* Bottom Navigation */}
-       <div className="absolute bottom-0 w-full bg-white border-t border-gray-100 flex justify-around items-end py-2 z-50 rounded-t-[2rem] shadow-[0_-10px_40px_rgba(0,0,0,0.08)] px-2">
-            <button 
-                onClick={() => setActiveTab('SEARCH')} 
-                className={`flex flex-col items-center gap-0.5 p-2 rounded-2xl transition-all duration-300 w-16 group ${activeTab === 'SEARCH' ? 'text-brandBlue -translate-y-1' : 'text-gray-300 hover:text-gray-400'}`}
-            >
-                <div className={`p-1.5 rounded-full transition-all ${activeTab === 'SEARCH' ? 'bg-blue-50 shadow-inner' : ''}`}>
-                    <Search size={20} strokeWidth={activeTab === 'SEARCH' ? 3 : 2.5} />
-                </div>
-                <span className="text-[10px] font-black tracking-wide">경로 탐색</span>
-            </button>
 
-            {/* <button 
-                onClick={() => setActiveTab('OPEN_NOW')} 
-                className={`flex flex-col items-center gap-0.5 p-2 rounded-2xl transition-all duration-300 w-16 group ${activeTab === 'OPEN_NOW' ? 'text-brandPink -translate-y-1' : 'text-gray-300 hover:text-gray-400'}`}
-            >
-                <div className={`p-1.5 rounded-full transition-all ${activeTab === 'OPEN_NOW' ? 'bg-pink-50 shadow-inner' : ''}`}>
-                    <Store size={20} strokeWidth={activeTab === 'OPEN_NOW' ? 3 : 2.5} />
-                </div>
-                <span className="text-[10px] font-black tracking-wide">영업중</span>
-            </button> */}
+       {/* 내 정보 오버레이 */}
+       {activeTab === 'MY_PAGE' && (
+           <div className="absolute inset-0 z-[80] animate-in slide-in-from-right-full duration-300">
+               {renderMyPage()}
+           </div>
+       )}
 
-            <button 
-                onClick={() => setActiveTab('HISTORY')} 
-                className={`flex flex-col items-center gap-0.5 p-2 rounded-2xl transition-all duration-300 w-16 group ${activeTab === 'HISTORY' ? 'text-brandBlue -translate-y-1' : 'text-gray-300 hover:text-gray-400'}`}
+       {/* 로그인 유도 팝업 */}
+       {showLoginPrompt && (
+           <div className="absolute inset-0 z-[90] bg-black/50 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-200"
+               onClick={() => setShowLoginPrompt(false)}>
+               <div className="bg-white w-full rounded-t-[2rem] p-7 shadow-2xl animate-in slide-in-from-bottom-4 duration-300"
+                   onClick={e => e.stopPropagation()}>
+                   <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-6" />
+                   {/* 아이콘 */}
+                   <div className="flex justify-center mb-4">
+                       <div className="w-16 h-16 rounded-full bg-brandBlue flex items-center justify-center shadow-lg shadow-blue-200">
+                           <Beer size={28} className="text-white -rotate-12" />
+                       </div>
+                   </div>
+                   <p className="text-center text-xl font-black text-gray-800 leading-snug mb-2">
+                       오늘 더 오래 놀고<br/>더 싸게 귀가하세요 🍻
+                   </p>
+                   <p className="text-center text-sm text-gray-400 font-medium leading-relaxed mb-7">
+                       로그인하고 찐막차의 스마트 귀가 경로를<br/>지금 바로 검색해보세요!
+                   </p>
+                   <button
+                       onClick={() => { setShowLoginPrompt(false); setShowLoginOverlay(true); }}
+                       className="w-full bg-brandBlue text-white font-black text-lg py-4 rounded-2xl shadow-lg shadow-blue-200 active:scale-[0.98] transition-transform"
+                   >
+                       로그인하기
+                   </button>
+                   <button
+                       onClick={() => setShowLoginPrompt(false)}
+                       className="w-full mt-3 py-3 text-gray-400 font-bold text-sm"
+                   >
+                       나중에 할게요
+                   </button>
+               </div>
+           </div>
+       )}
 
-            >
-                <div className={`p-1.5 rounded-full transition-all ${activeTab === 'HISTORY' ? 'bg-blue-50 shadow-inner' : ''}`}>
-                    <Bell size={20} strokeWidth={activeTab === 'HISTORY' ? 3 : 2.5} />
-                </div>
-                <span className="text-[10px] font-black tracking-wide">알림</span>
-            </button>
-
-            <button 
-                onClick={() => setActiveTab('MY_PAGE')} 
-                className={`flex flex-col items-center gap-0.5 p-2 rounded-2xl transition-all duration-300 w-16 group ${activeTab === 'MY_PAGE' ? 'text-brandBlue -translate-y-1' : 'text-gray-300 hover:text-gray-400'}`}
-            >
-                <div className={`p-1.5 rounded-full transition-all ${activeTab === 'MY_PAGE' ? 'bg-blue-50 shadow-inner' : ''}`}>
-                    <User size={20} strokeWidth={activeTab === 'MY_PAGE' ? 3 : 2.5} />
-                </div>
-                <span className="text-[10px] font-black tracking-wide">내 정보</span>
-            </button>
-       </div>
+       {/* 로그인 오버레이 */}
+       {showLoginOverlay && (
+           <div className="absolute inset-0 z-[90] animate-in slide-in-from-bottom-full duration-300">
+               <div className="h-full relative">
+                   {renderLogin()}
+                   <button
+                       onClick={() => setShowLoginOverlay(false)}
+                       className="absolute top-5 right-5 z-10 w-9 h-9 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md hover:bg-white transition-colors"
+                   >
+                       <X size={18} className="text-gray-600" />
+                   </button>
+               </div>
+           </div>
+       )}
     </div>
   );
 };

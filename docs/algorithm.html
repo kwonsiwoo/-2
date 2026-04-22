@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>찐막차 경로 추출 알고리즘</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #1a1a1a;
+    background: #fff;
+    padding: 40px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  h1 {
+    font-size: 22px;
+    font-weight: 900;
+    border-bottom: 3px solid #1a1a2e;
+    padding-bottom: 10px;
+    margin-bottom: 6px;
+  }
+
+  .subtitle {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 32px;
+  }
+
+  h2 {
+    font-size: 16px;
+    font-weight: 900;
+    background: #1a1a2e;
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 6px;
+    margin: 28px 0 14px;
+  }
+
+  h3 {
+    font-size: 13px;
+    font-weight: 800;
+    color: #0f3460;
+    border-left: 4px solid #0f3460;
+    padding-left: 10px;
+    margin: 18px 0 10px;
+  }
+
+  h4 {
+    font-size: 12px;
+    font-weight: 700;
+    color: #333;
+    margin: 14px 0 6px;
+  }
+
+  p { margin-bottom: 8px; }
+
+  pre {
+    background: #f4f4f4;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 11.5px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    margin: 10px 0;
+    page-break-inside: avoid;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 16px;
+    font-size: 12px;
+    page-break-inside: avoid;
+  }
+
+  th {
+    background: #e8edf5;
+    font-weight: 800;
+    padding: 7px 10px;
+    text-align: left;
+    border: 1px solid #ccc;
+  }
+
+  td {
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    vertical-align: top;
+  }
+
+  tr:nth-child(even) td { background: #fafafa; }
+
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin-right: 4px;
+  }
+  .badge-blue  { background: #dbeafe; color: #1d4ed8; }
+  .badge-green { background: #dcfce7; color: #15803d; }
+  .badge-red   { background: #fee2e2; color: #dc2626; }
+  .badge-gray  { background: #f1f5f9; color: #475569; }
+
+  .box {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 10px 0;
+    background: #fafafa;
+    page-break-inside: avoid;
+  }
+
+  .box.highlight {
+    border-color: #93c5fd;
+    background: #eff6ff;
+  }
+
+  .formula {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    background: #fff8e1;
+    border: 1px solid #f59e0b;
+    border-radius: 4px;
+    padding: 2px 6px;
+    white-space: nowrap;
+  }
+
+  ul { padding-left: 20px; margin-bottom: 8px; }
+  li { margin-bottom: 3px; }
+
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 12px 0;
+  }
+
+  .pipeline-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .pipeline-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 32px;
+    flex-shrink: 0;
+  }
+
+  .step-num {
+    width: 28px;
+    height: 28px;
+    background: #1a1a2e;
+    color: #fff;
+    font-weight: 900;
+    font-size: 12px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .step-connector {
+    width: 2px;
+    height: 20px;
+    background: #cbd5e1;
+  }
+
+  .step-body {
+    padding: 4px 0 16px;
+    flex: 1;
+  }
+
+  .step-title {
+    font-weight: 800;
+    font-size: 13px;
+    color: #0f3460;
+    margin-bottom: 3px;
+  }
+
+  .step-desc {
+    font-size: 12px;
+    color: #555;
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin: 10px 0;
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid #e5e7eb;
+    margin: 24px 0;
+  }
+
+  @media print {
+    body { padding: 20px; font-size: 12px; }
+    h2 { font-size: 14px; }
+    @page { margin: 15mm; }
+  }
+</style>
+</head>
+<body>
+
+<h1>찐막차 경로 추출 알고리즘</h1>
+<p class="subtitle">odsayService.ts · tmapService.ts · transitScheduleService.ts 기반 | 작성일: 2026-04-22</p>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<h2>① 전체 파이프라인</h2>
+
+<div class="pipeline">
+  <div class="pipeline-step">
+    <div class="pipeline-line"><div class="step-num">1</div><div class="step-connector"></div></div>
+    <div class="step-body">
+      <div class="step-title">지오코딩 — 주소 → 좌표 변환</div>
+      <div class="step-desc">TMAP 도로명주소 → OSM Nominatim → TMAP POI 순으로 시도. 주소를 최대 7가지 변형 후보로 확장해 각각 시도.</div>
+    </div>
+  </div>
+  <div class="pipeline-step">
+    <div class="pipeline-line"><div class="step-num">2</div><div class="step-connector"></div></div>
+    <div class="step-body">
+      <div class="step-title">ODsay API 원시 경로 수신</div>
+      <div class="step-desc">출발·도착 좌표를 서버 프록시(/api/odsay)에 전달. 출발 시각 지정 시 SearchDate·SearchTime 파라미터 추가.</div>
+    </div>
+  </div>
+  <div class="pipeline-step">
+    <div class="pipeline-line"><div class="step-num">3</div><div class="step-connector"></div></div>
+    <div class="step-body">
+      <div class="step-title">경로 유효성 필터링 <span class="badge badge-gray">출발 시각 지정 시만 작동</span></div>
+      <div class="step-desc">총 소요시간 240분 초과 제거 / 유휴 시간 30분 초과 제거 / TAGO API로 실제 운행 여부 확인.</div>
+    </div>
+  </div>
+  <div class="pipeline-step">
+    <div class="pipeline-line"><div class="step-num">4</div><div class="step-connector"></div></div>
+    <div class="step-body">
+      <div class="step-title">택시 제외 모드 분기</div>
+      <div class="step-desc"><strong>excludeTaxi=true</strong>이면 MCDM 엔진 스킵 → 순수 대중교통 경로 3개 즉시 반환.</div>
+    </div>
+  </div>
+  <div class="pipeline-step">
+    <div class="pipeline-line"><div class="step-num">5</div><div class="step-connector"></div></div>
+    <div class="step-body">
+      <div class="step-title">MCDM 하이브리드 경로 생성</div>
+      <div class="step-desc">시간대 감지 → 3가지 전략(time-saving / cost-saving / balanced)으로 각각 경로 생성. 경로당 택시 1회 삽입.</div>
+    </div>
+  </div>
+  <div class="pipeline-step">
+    <div class="pipeline-line"><div class="step-num">6</div></div>
+    <div class="step-body">
+      <div class="step-title">클라이언트 사이드 필터 적용</div>
+      <div class="step-desc">최대 택시비 / 최대 도보 시간 / 최대 환승 횟수 조건으로 화면 출력 직전 추가 필터링.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<h2>② 지오코딩 상세</h2>
+
+<h3>주소 변형 후보 생성 규칙 (최대 7가지)</h3>
+<table>
+  <tr><th>#</th><th>규칙</th><th>예시</th></tr>
+  <tr><td>1</td><td>원문 그대로</td><td>경인로 지하 877 (동수역)</td></tr>
+  <tr><td>2</td><td>괄호 안 역명 추출</td><td>동수역</td></tr>
+  <tr><td>3</td><td>역명 패턴 추출 (가-힣+역)</td><td>동수역</td></tr>
+  <tr><td>4</td><td>"지하 NNN" 제거</td><td>경인로  877 (동수역)</td></tr>
+  <tr><td>5</td><td>시/도 앞부분 제거</td><td>"경기 부천시..." → "부천시..."</td></tr>
+  <tr><td>6</td><td>구(區) 레벨 제거</td><td>"부천시 원미구 조마루로" → "부천시 조마루로"</td></tr>
+  <tr><td>7</td><td>도로명+번지만 추출</td><td>조마루로385번길 92</td></tr>
+</table>
+
+<h3>지오코딩 엔진 우선순위</h3>
+<table>
+  <tr><th>순위</th><th>엔진</th><th>특징</th></tr>
+  <tr><td>1</td><td>TMAP 도로명주소 Geocoding</td><td>도로명주소에 가장 정확, 국내 최적</td></tr>
+  <tr><td>2</td><td>OSM Nominatim</td><td>TMAP 실패 시 폴백, 장소명·POI에 강함</td></tr>
+  <tr><td>3</td><td>TMAP POI 검색</td><td>역명·건물명 등 비정형 키워드</td></tr>
+</table>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<h2>③ 경로 유효성 필터링</h2>
+<p><span class="badge badge-gray">출발 시각 지정 시에만 작동</span> 3가지 조건을 모두 통과해야 유효한 경로로 사용됨.</p>
+
+<div class="two-col">
+  <div class="box">
+    <h4>조건 1 — 총 소요시간 제한</h4>
+    <pre>totalTime > 240분  →  제외</pre>
+  </div>
+  <div class="box">
+    <h4>조건 2 — 유휴 시간 과다 제거</h4>
+    <pre>totalTime - Σ(sectionTime) > 30분  →  제외</pre>
+    <p style="font-size:11px;color:#666;">대기 시간이 비정상적으로 많은 경로 제거</p>
+  </div>
+</div>
+
+<h3>조건 3 — 실제 운행 가능 여부 (transitScheduleService)</h3>
+<table>
+  <tr><th>세그먼트</th><th>운행 가능 시간</th><th>불가 시간</th><th>판단 방식</th></tr>
+  <tr><td>도보</td><td>항상</td><td>-</td><td>즉시 통과</td></tr>
+  <tr><td>지하철 (type=1)</td><td>05:30 ~ 00:30</td><td>01:00 ~ 05:29</td><td>시간대 직접 비교</td></tr>
+  <tr><td>일반버스 (type=2)</td><td>04:30 ~ 24:00</td><td>01:00 ~ 04:29</td><td>시간대 직접 비교</td></tr>
+  <tr><td>심야버스 N버스 (routetp=16)</td><td>23:30 ~ 05:30</td><td>-</td><td>TAGO API 노선유형 조회</td></tr>
+</table>
+
+<h4>심야버스 판별 순서</h4>
+<ol style="padding-left:18px;font-size:12px;line-height:2;">
+  <li>버스 번호가 <code>N</code>으로 시작하면 즉시 심야버스 판정</li>
+  <li>TAGO BusRouteInfoInqireService API로 <code>routetp</code> 조회 → <code>16</code>이면 심야버스</li>
+  <li>API 실패 시 → <code>N\d</code> 패턴 기반 폴백</li>
+  <li>조회 결과는 <strong>24시간 메모리 캐시</strong> 적용</li>
+</ol>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<h2>④ MCDM 하이브리드 경로 생성</h2>
+
+<h3>시간대 감지</h3>
+<table>
+  <tr><th>시간</th><th>모드</th><th>time-saving 레이블</th><th>cost-saving 레이블</th><th>balanced 레이블</th></tr>
+  <tr><td>06:00 ~ 19:59</td><td><span class="badge badge-blue">day 주간</span></td><td>⚡ 빠른 귀가형</td><td>💰 알뜰 귀가형</td><td>⚖️ 밸런스형</td></tr>
+  <tr><td>20:00 ~ 05:59</td><td><span class="badge badge-gray">night 야간</span></td><td>🌙 최대 체류형</td><td>💰 알뜰 막차형</td><td>⚖️ 스마트 막차형</td></tr>
+</table>
+
+<h3>전략 × ODsay 경로 매핑</h3>
+<table>
+  <tr><th>전략</th><th>사용 ODsay 경로</th><th>의미</th></tr>
+  <tr><td>time-saving</td><td>0번 (최상위)</td><td>ODsay가 가장 빠르다고 추천한 경로 기반</td></tr>
+  <tr><td>cost-saving</td><td>0번 (최상위)</td><td>동일 경로, 택시 삽입 전략만 다름</td></tr>
+  <tr><td>balanced</td><td>1번 (차선)</td><td>두 번째 경로 기반, 다양성 확보</td></tr>
+</table>
+
+<hr class="divider">
+
+<h3>택시 삽입 분기 — 경로당 택시 1회</h3>
+
+<div class="box highlight">
+  <strong>택시 후보 조건:</strong> 도보 구간 중 <span class="formula">max(사용자 설정 도보 임계값, 10분)</span> 초과인 것만.<br>
+  기본 임계값 = 20분 / 최소 하드 하한 = 10분 (사용자가 10분 이하로 설정해도 10분 미만 도보는 택시 불가)
+</div>
+
+<h4>Case A — 도보 구간을 택시로 대체 (후보 존재 시)</h4>
+
+<table>
+  <tr><th>모드</th><th>time-saving</th><th>cost-saving</th><th>balanced</th></tr>
+  <tr>
+    <td><span class="badge badge-gray">야간</span></td>
+    <td>마지막 도보<br><small>(막차 의존 최소화)</small></td>
+    <td>가장 짧은 도보<br><small>(최소 비용)</small></td>
+    <td>포지션 가중 / 택시비<br>점수 최대<br><small>(마지막=3.0×, 그 외=1.5×)</small></td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-blue">주간</span></td>
+    <td>효율점수 × 위치 가중치 최대<br><small>(첫번째=1.3×, 마지막=1.2×, 그 외=1.0×)</small></td>
+    <td>마지막 도보</td>
+    <td>순수 효율점수 최대</td>
+  </tr>
+</table>
+
+<div class="two-col" style="margin-top:12px;">
+  <div class="box">
+    <h4>택시 요금 계산 (도보 대체)</h4>
+    <pre>도보거리(m) = (도보분 / 60) × 4,000m
+택시요금    = 4,800원
+              + ceil((거리m - 1,600) / 131) × 100원
+분단축      = round(도보분 × (1 - 4/25))  ≈ 84%
+택시시간    = max(1, 도보분 - 분단축)</pre>
+  </div>
+  <div class="box">
+    <h4>효율점수 (timeValueScore)</h4>
+    <pre>효율점수 = 분단축 / 택시비 × 1,000
+(단위: 분/천원, 클수록 가성비 좋음)</pre>
+  </div>
+</div>
+
+<h4>Case B — 환승 지점에서 목적지까지 택시 (도보 후보 없을 때)</h4>
+
+<p>각 대중교통 종점을 후보로 평가:</p>
+<ul>
+  <li>목적지까지 <strong>Haversine 직선 거리</strong> 계산</li>
+  <li>0.3km 미만 지점 제외 (너무 가까움)</li>
+  <li>점수 = <span class="formula">(남은경로시간 - 택시시간) / 택시비 × 1000</span></li>
+  <li>시간 절약이 없으면 점수 = <span class="formula">-거리(km)</span> (거리 기준 정렬로 전환)</li>
+</ul>
+
+<table style="margin-top:10px;">
+  <tr><th>모드</th><th>time-saving</th><th>cost-saving</th><th>balanced</th></tr>
+  <tr>
+    <td><span class="badge badge-gray">야간</span></td>
+    <td>마지막 환승 지점</td>
+    <td>목적지와 가장 가까운 지점</td>
+    <td>점수 최대</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-blue">주간</span></td>
+    <td>점수 최대</td>
+    <td>목적지와 가장 가까운 지점</td>
+    <td>점수 최대</td>
+  </tr>
+</table>
+
+<div class="box" style="margin-top:12px;">
+  <h4>택시 요금 계산 (환승 지점)</h4>
+  <pre>직선거리(km) = Haversine(환승지점, 목적지)
+택시요금     = 4,800원 + ceil((거리m - 1,600) / 131) × 100원
+택시시간     = max(2, round(거리km / 25 × 60))분</pre>
+</div>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<h2>⑤ 클라이언트 사이드 필터</h2>
+<p>API 재호출 없이 이미 수신한 경로에서 화면 출력 직전 추가 필터링.</p>
+
+<table>
+  <tr><th>필터</th><th>조건</th><th>API 재호출</th></tr>
+  <tr><td>최대 택시비</td><td>route.taxiWalkCost &gt; filterMaxTaxi → 제외</td><td><span class="badge badge-green">No</span></td></tr>
+  <tr><td>최대 도보 시간</td><td>잔여 도보 합계 &gt; filterMaxWalk → 제외</td><td><span class="badge badge-red">Yes (임계값 변경 시)</span></td></tr>
+  <tr><td>최대 환승 횟수</td><td>route.transferCount &gt; filterMaxTransfer → 제외</td><td><span class="badge badge-green">No</span></td></tr>
+  <tr><td>출발 시각 지정</td><td>해당 시각으로 ODsay 재조회</td><td><span class="badge badge-red">Yes</span></td></tr>
+  <tr><td>택시 제외 전환</td><td>buildPureRoute로 ODsay 재조회</td><td><span class="badge badge-red">Yes</span></td></tr>
+</table>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<h2>⑥ 경로 추출에 영향을 주는 모든 요인</h2>
+
+<table>
+  <tr><th>분류</th><th>요인</th><th>영향 범위</th></tr>
+  <tr><td>입력</td><td>출발지/도착지 텍스트</td><td>지오코딩 성공 여부, 경로 전체</td></tr>
+  <tr><td>입력</td><td>출발 시각</td><td>운행 가능 경로 필터링 활성화</td></tr>
+  <tr><td>시스템</td><td>현재 시각</td><td>주간/야간 모드 결정, 택시 전략 가중치</td></tr>
+  <tr><td>API</td><td>ODsay 반환 경로 수·순서</td><td>전략별 사용 경로 번호 결정</td></tr>
+  <tr><td>필터</td><td>도보 임계값 (기본 20분, 하드 최소 10분)</td><td>택시 대체 후보 결정 (낮을수록 택시 기회 감소)</td></tr>
+  <tr><td>필터</td><td>택시 제외 여부</td><td>MCDM 엔진 전체 스킵</td></tr>
+  <tr><td>필터</td><td>최대 택시비</td><td>클라이언트 후처리 경로 제거</td></tr>
+  <tr><td>필터</td><td>최대 환승 횟수</td><td>클라이언트 후처리 경로 제거</td></tr>
+  <tr><td>알고리즘</td><td>도보 세그먼트 위치 (첫째/마지막)</td><td>주간 time-saving 가중치 1.3× / 1.2×</td></tr>
+  <tr><td>알고리즘</td><td>Haversine 직선 거리</td><td>환승 지점 택시비·소요 시간 계산</td></tr>
+  <tr><td>데이터</td><td>TAGO 버스 노선 유형 (routetp)</td><td>심야 시간대 경로 생존 여부</td></tr>
+  <tr><td>데이터</td><td>ODsay sectionTime / totalTime 값</td><td>유효성 필터 조건 1·2 통과 여부</td></tr>
+</table>
+
+<hr class="divider">
+<p style="font-size:11px;color:#999;text-align:center;">찐막차 v2.1.0 · 내부 문서 · 2026-04-22</p>
+
+</body>
+</html>
