@@ -32,12 +32,21 @@ export default function Admin() {
     try {
       const res = await fetch(`/api/admin-stats?password=${encodeURIComponent(pw)}`);
       if (res.status === 401) { setError('비밀번호가 틀렸습니다'); setAuthed(false); return; }
-      const data: Stats = await res.json();
+      const text = await res.text();
+      let data: Stats & { notice?: string; error?: string };
+      try {
+        data = JSON.parse(text);
+      } catch {
+        setError(`응답 파싱 실패: ${text.slice(0, 200)}`);
+        return;
+      }
+      if (data.error) { setError(`API 오류: ${data.error}`); return; }
+      if (data.notice) setError(`⚠️ ${data.notice}`);
       setStats(data);
       setAuthed(true);
       setLastUpdated(new Date());
-    } catch {
-      setError('데이터를 불러오지 못했습니다');
+    } catch (e: any) {
+      setError(`네트워크 오류: ${e.message}`);
     } finally {
       setLoading(false);
     }
@@ -128,6 +137,13 @@ export default function Admin() {
       </div>
 
       <div className="max-w-3xl mx-auto p-6 space-y-6">
+        {/* 오류/공지 배너 */}
+        {error && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+            <p className="text-amber-800 text-sm font-medium break-all">{error}</p>
+          </div>
+        )}
+
         {/* 핵심 지표 카드 */}
         <div>
           <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3">전체 누적 통계</h2>
