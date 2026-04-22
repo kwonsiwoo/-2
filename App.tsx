@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { MapPin, Navigation, Bus, Train, ArrowRight, ChevronLeft, Search, Beer, Car, Clock, Sparkles, User, CreditCard, Home, Settings, Edit2, Bell, ToggleLeft, ToggleRight, Store, Star, X, Utensils, BellRing, Shield, TrendingUp, Phone, Footprints, ChevronRight, FileText, Plus, Coffee, Wine } from 'lucide-react';
+import { MapPin, Navigation, Bus, Train, ArrowRight, ChevronLeft, Search, Beer, Car, Clock, Sparkles, User, CreditCard, Home, Settings, Edit2, Bell, ToggleLeft, ToggleRight, Store, Star, X, Utensils, BellRing, Shield, TrendingUp, Phone, Footprints, ChevronRight, FileText, Plus, Coffee, Wine, Mail, Camera } from 'lucide-react';
 import { getOdsayTransitRoutes } from './services/odsayService';
 import { findLatestDeparture } from './services/latestDepartureService';
 import { AppState, HybridRoute, LDTResult, Place } from './types';
@@ -142,6 +142,9 @@ const App: React.FC = () => {
   
   // Notice Detail State
   const [selectedNotice, setSelectedNotice] = useState<any | null>(null);
+  const [showMyPageNotices, setShowMyPageNotices] = useState(false);
+  const [showCustomerService, setShowCustomerService] = useState(false);
+  const [showTaxiSelector, setShowTaxiSelector] = useState(false);
   
   // LDT (오늘의 찐막차) State
   const [ldtResult, setLdtResult] = useState<LDTResult | null>(null);
@@ -189,6 +192,8 @@ const App: React.FC = () => {
   // Advanced My Page State
   const [nickname, setNickname] = useState('프로 막차러');
   const [tempNickname, setTempNickname] = useState('');
+  const [profileImage, setProfileImage] = useState('');
+  const [tempProfileImage, setTempProfileImage] = useState('');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [emergencyPhone, setEmergencyPhone] = useState('010-xxxx-xxxx');
   const [isEditingPhone, setIsEditingPhone] = useState(false);
@@ -494,8 +499,34 @@ const App: React.FC = () => {
       }
   };
 
-  const handleKakaoTaxi = () => {
-      window.location.href = 'https://t.kakao.com/'; 
+  const openTaxiApp = (app: 'kakao' | 'ut') => {
+      setShowTaxiSelector(false);
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isAndroid = /Android/.test(navigator.userAgent);
+
+      const config = {
+          kakao: {
+              scheme: 'kakaot://',
+              intentUrl: 'intent://taxi#Intent;scheme=kakaot;package=com.kakao.taxi;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.kakao.taxi;end',
+              iosStore: 'https://apps.apple.com/kr/app/kakao-t/id981110422',
+              web: 'https://t.kakao.com/',
+          },
+          ut: {
+              scheme: 'ut://',
+              intentUrl: 'intent://main#Intent;scheme=ut;package=com.skt.ut;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.skt.ut;end',
+              iosStore: 'https://apps.apple.com/kr/app/ut/id1550366601',
+              web: 'https://www.ut.cab/',
+          },
+      }[app];
+
+      if (isAndroid) {
+          window.location.href = config.intentUrl;
+      } else if (isIOS) {
+          window.location.href = config.scheme;
+          setTimeout(() => { window.location.href = config.iosStore; }, 1500);
+      } else {
+          window.open(config.web, '_blank');
+      }
   };
 
   const handleGoHome = () => {
@@ -519,9 +550,8 @@ const App: React.FC = () => {
   };
   
   const saveNickname = () => {
-      if (tempNickname.trim()) {
-        setNickname(tempNickname);
-      }
+      if (tempNickname.trim()) setNickname(tempNickname);
+      if (tempProfileImage) setProfileImage(tempProfileImage);
       setIsEditingProfile(false);
   };
 
@@ -1059,8 +1089,10 @@ const App: React.FC = () => {
                 <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-brandPink/20 rounded-full blur-2xl" />
 
                 <div className="relative z-10 flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center shrink-0">
-                        <User size={32} className="text-white" />
+                    <div className="w-16 h-16 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center shrink-0 overflow-hidden">
+                        {profileImage
+                            ? <img src={profileImage} className="w-full h-full object-cover" alt="프로필" />
+                            : <User size={32} className="text-white" />}
                     </div>
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
@@ -1070,7 +1102,7 @@ const App: React.FC = () => {
                         <p className="text-blue-100 text-sm font-medium">서울 마스터 🏙️</p>
                     </div>
                     <button
-                        onClick={() => { setIsEditingProfile(true); setTempNickname(nickname); }}
+                        onClick={() => { setIsEditingProfile(true); setTempNickname(nickname); setTempProfileImage(''); }}
                         className="p-2.5 bg-white/20 hover:bg-white/30 rounded-full backdrop-blur-md transition-colors shrink-0"
                     >
                         <Edit2 size={15} className="text-white" />
@@ -1196,7 +1228,7 @@ const App: React.FC = () => {
                     <div className="px-5 pt-4 pb-2">
                         <p className="text-[11px] font-black text-gray-400 uppercase tracking-wide">앱 정보</p>
                     </div>
-                    <button className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors active:bg-gray-100">
+                    <button onClick={() => setShowMyPageNotices(true)} className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors active:bg-gray-100">
                         <div className="w-10 h-10 rounded-2xl bg-gray-50 flex items-center justify-center shrink-0">
                             <FileText size={18} className="text-gray-400" />
                         </div>
@@ -1206,7 +1238,7 @@ const App: React.FC = () => {
                         <ChevronRight size={16} className="text-gray-300 shrink-0" />
                     </button>
                     <div className="mx-5 h-px bg-gray-50" />
-                    <button className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors active:bg-gray-100">
+                    <button onClick={() => setShowCustomerService(true)} className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors active:bg-gray-100">
                         <div className="w-10 h-10 rounded-2xl bg-gray-50 flex items-center justify-center shrink-0">
                             <Phone size={18} className="text-gray-400" />
                         </div>
@@ -1226,19 +1258,144 @@ const App: React.FC = () => {
             </div>
         </div>
 
+        {/* 공지사항 상세 페이지 */}
+        {showMyPageNotices && (
+            <div className="absolute inset-0 z-[60] bg-gray-50 flex flex-col animate-in slide-in-from-right-full duration-300">
+                <header className="px-5 py-4 bg-white sticky top-0 z-20 shadow-sm flex items-center gap-2">
+                    <button onClick={() => { setShowMyPageNotices(false); setSelectedNotice(null); }} className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
+                        <ChevronLeft size={24} />
+                    </button>
+                    <h2 className="text-xl font-black text-gray-800">공지사항</h2>
+                </header>
+                {selectedNotice ? (
+                    <div className="flex-1 overflow-y-auto p-6">
+                        <button onClick={() => setSelectedNotice(null)} className="flex items-center gap-1 text-gray-400 text-sm font-bold mb-5 hover:text-gray-600">
+                            <ChevronLeft size={16} /> 목록으로
+                        </button>
+                        <div className="mb-4">
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="bg-brandPink/10 text-brandPink text-xs font-bold px-2 py-1 rounded-md">공지</span>
+                                <span className="text-sm text-gray-400 font-medium">{selectedNotice.date}</span>
+                            </div>
+                            <h1 className="text-2xl font-black text-gray-800 leading-tight">{selectedNotice.title}</h1>
+                        </div>
+                        <div className="w-full h-px bg-gray-100 mb-6" />
+                        <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">{selectedNotice.content}</p>
+                    </div>
+                ) : (
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                        {historyData.filter(item => item.type === 'alert').map((item, index) => (
+                            <div
+                                key={index}
+                                onClick={() => setSelectedNotice(item)}
+                                className="bg-white rounded-2xl px-5 py-4 border border-gray-100 shadow-sm cursor-pointer hover:bg-gray-50 active:scale-[0.98] transition-all flex items-start gap-4"
+                            >
+                                <div className="w-10 h-10 rounded-2xl bg-brandPink/10 flex items-center justify-center shrink-0">
+                                    <Bell size={18} className="text-brandPink" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-black text-gray-800 text-sm leading-snug">{item.title}</p>
+                                    <p className="text-xs text-gray-400 mt-0.5">{item.desc}</p>
+                                    <p className="text-[11px] text-gray-300 mt-1 font-medium">{item.date}</p>
+                                </div>
+                                <ChevronRight size={16} className="text-gray-300 shrink-0 mt-1" />
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        )}
+
+        {/* 고객센터 상세 페이지 */}
+        {showCustomerService && (
+            <div className="absolute inset-0 z-[60] bg-gray-50 flex flex-col animate-in slide-in-from-right-full duration-300">
+                <header className="px-5 py-4 bg-white sticky top-0 z-20 shadow-sm flex items-center gap-2">
+                    <button onClick={() => setShowCustomerService(false)} className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
+                        <ChevronLeft size={24} />
+                    </button>
+                    <h2 className="text-xl font-black text-gray-800">고객센터</h2>
+                </header>
+                <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="px-5 pt-5 pb-3">
+                            <p className="text-[11px] font-black text-gray-400 uppercase tracking-wide mb-4">문의 연락처</p>
+                            <a href="mailto:ksw@onion.co.kr" className="flex items-center gap-4 py-3 hover:bg-gray-50 rounded-2xl px-1 transition-colors active:scale-[0.98]">
+                                <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center shrink-0">
+                                    <Mail size={18} className="text-brandBlue" />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-[11px] text-gray-400 font-bold">이메일</p>
+                                    <p className="text-sm font-black text-gray-800">ksw@onion.co.kr</p>
+                                </div>
+                                <ChevronRight size={16} className="text-gray-300 shrink-0" />
+                            </a>
+                            <div className="mx-1 h-px bg-gray-50 my-1" />
+                            <a href="tel:032-324-9817" className="flex items-center gap-4 py-3 hover:bg-gray-50 rounded-2xl px-1 transition-colors active:scale-[0.98]">
+                                <div className="w-10 h-10 rounded-2xl bg-green-50 flex items-center justify-center shrink-0">
+                                    <Phone size={18} className="text-green-500" />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-[11px] text-gray-400 font-bold">전화</p>
+                                    <p className="text-sm font-black text-gray-800">032-324-9817</p>
+                                </div>
+                                <ChevronRight size={16} className="text-gray-300 shrink-0" />
+                            </a>
+                        </div>
+                        <div className="px-5 pb-5">
+                            <div className="bg-blue-50 rounded-2xl px-4 py-3 mt-2">
+                                <p className="text-xs text-brandBlue font-bold">운영 시간</p>
+                                <p className="text-xs text-blue-600 font-medium mt-0.5">평일 09:00 ~ 18:00 (주말·공휴일 휴무)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {/* 닉네임 편집 모달 */}
         {isEditingProfile && (
             <div className="absolute inset-0 z-[60] bg-black/60 flex items-end backdrop-blur-sm">
                 <div className="bg-white w-full rounded-t-[2rem] p-6 shadow-2xl">
                     <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
-                    <p className="text-lg font-black text-gray-800 mb-4">닉네임 변경</p>
+                    <p className="text-lg font-black text-gray-800 mb-5">프로필 편집</p>
+
+                    {/* 프로필 사진 */}
+                    <div className="flex flex-col items-center mb-6">
+                        <div className="relative">
+                            <div className="w-20 h-20 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center overflow-hidden">
+                                {tempProfileImage
+                                    ? <img src={tempProfileImage} className="w-full h-full object-cover" alt="미리보기" />
+                                    : profileImage
+                                        ? <img src={profileImage} className="w-full h-full object-cover" alt="프로필" />
+                                        : <User size={36} className="text-gray-400" />}
+                            </div>
+                            <label className="absolute bottom-0 right-0 w-7 h-7 bg-brandBlue rounded-full flex items-center justify-center cursor-pointer shadow-md hover:bg-blue-600 transition-colors">
+                                <Camera size={14} className="text-white" />
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+                                        const reader = new FileReader();
+                                        reader.onload = (ev) => setTempProfileImage(ev.target?.result as string);
+                                        reader.readAsDataURL(file);
+                                    }}
+                                />
+                            </label>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-2 font-medium">사진을 눌러 변경하세요</p>
+                    </div>
+
+                    {/* 닉네임 */}
+                    <p className="text-xs font-black text-gray-400 mb-2 uppercase tracking-wide">닉네임</p>
                     <input
                         type="text"
                         value={tempNickname}
                         onChange={(e) => setTempNickname(e.target.value)}
                         placeholder="새 닉네임 (최대 10자)"
-                        className="w-full bg-gray-50 border-2 border-transparent focus:border-brandBlue rounded-2xl px-5 py-4 mb-4 focus:outline-none font-bold text-gray-800"
-                        autoFocus
+                        className="w-full bg-gray-50 border-2 border-transparent focus:border-brandBlue rounded-2xl px-5 py-4 mb-5 focus:outline-none font-bold text-gray-800"
                         maxLength={10}
                     />
                     <div className="flex gap-3">
@@ -1467,6 +1624,25 @@ const App: React.FC = () => {
         )}
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* 낮 시간대 안내 배너 (06:00~18:00) */}
+            {(() => {
+                const h = new Date().getHours();
+                return h >= 6 && h < 18;
+            })() && (
+                <div className="bg-amber-200 border border-amber-300 rounded-3xl px-4 py-3.5 flex items-start gap-3">
+                    <span className="text-xl shrink-0">☀️</span>
+                    <div>
+                        <p className="text-gray-900 text-sm font-black leading-snug">
+                            지금 택시 타면 아깝잖아요! 그 돈 아껴서 밤에 한 잔 더 하세요.
+                        </p>
+                        <p className="text-gray-800 text-sm font-black mt-0.5 leading-snug">
+                            낮에는 지하철/버스가 정답입니다.
+                        </p>
+                        <p className="text-gray-900 text-xs font-medium mt-0.5">(아직은 다른 지도 앱이 더 유능해요... 소곤소곤)</p>
+                    </div>
+                </div>
+            )}
+
             {/* 오늘의 찐막차 배너 — 히든 처리 */}
             <div className="hidden">
             <div
@@ -2043,13 +2219,49 @@ const App: React.FC = () => {
               </div>
           </div>
           
-           <button 
-                onClick={handleKakaoTaxi}
-                className="w-full bg-[#FEE500] text-gray-900 font-black text-xl py-5 rounded-2xl shadow-lg hover:brightness-95 active:scale-95 transition-all flex items-center justify-center gap-2"
+           <button
+                onClick={() => setShowTaxiSelector(true)}
+                className="w-full bg-gray-900 text-white font-black text-xl py-5 rounded-2xl shadow-lg hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
            >
                 <Car size={24} />
-                <span>카카오T 호출하기</span>
+                <span>택시 호출하기</span>
            </button>
+
+           {/* 택시 앱 선택 시트 */}
+           {showTaxiSelector && (
+               <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-end" onClick={() => setShowTaxiSelector(false)}>
+                   <div className="bg-white w-full rounded-t-[2rem] p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+                       <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
+                       <p className="text-lg font-black text-gray-800 mb-1">택시 앱 선택</p>
+                       <p className="text-xs text-gray-400 font-medium mb-5">앱이 설치되어 있으면 바로 열립니다</p>
+                       <div className="space-y-3">
+                           <button
+                               onClick={() => openTaxiApp('kakao')}
+                               className="w-full flex items-center gap-4 bg-[#FEE500] rounded-2xl px-5 py-4 active:scale-[0.98] transition-transform"
+                           >
+                               <div className="w-11 h-11 rounded-xl bg-black/10 flex items-center justify-center shrink-0 text-xl font-black text-gray-900">T</div>
+                               <div className="flex-1 text-left">
+                                   <p className="font-black text-gray-900">카카오T</p>
+                                   <p className="text-xs text-gray-700 font-medium">카카오모빌리티</p>
+                               </div>
+                               <ChevronRight size={18} className="text-gray-600 shrink-0" />
+                           </button>
+                           <button
+                               onClick={() => openTaxiApp('ut')}
+                               className="w-full flex items-center gap-4 bg-[#FF6B00] rounded-2xl px-5 py-4 active:scale-[0.98] transition-transform"
+                           >
+                               <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0 text-xl font-black text-white">U</div>
+                               <div className="flex-1 text-left">
+                                   <p className="font-black text-white">UT (우티)</p>
+                                   <p className="text-xs text-orange-100 font-medium">SKT · Uber</p>
+                               </div>
+                               <ChevronRight size={18} className="text-white/70 shrink-0" />
+                           </button>
+                       </div>
+                       <button onClick={() => setShowTaxiSelector(false)} className="w-full mt-4 py-4 text-gray-400 font-bold text-sm">취소</button>
+                   </div>
+               </div>
+           )}
         </div>
       </div>
     );
