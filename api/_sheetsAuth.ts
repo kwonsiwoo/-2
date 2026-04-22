@@ -1,6 +1,4 @@
-// @vercel/node는 esbuild로 CJS 번들링 → require 사용
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createSign } = require('crypto') as typeof import('crypto');
+import { createSign } from 'node:crypto';
 
 let cachedToken: { value: string; exp: number } | null = null;
 
