@@ -81,10 +81,11 @@ const tmapPoiSearch = async (query: string): Promise<{ lat: number, lon: number 
     try {
         const key = (import.meta.env.VITE_TMAP_APP_KEY || '').trim();
         if (!key) return null;
-        const url = `https://apis.openapi.sk.com/tmap/pois?version=1&searchKeyword=${encodeURIComponent(query)}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=1`;
+        const url = `https://apis.openapi.sk.com/tmap/pois?version=1&searchKeyword=${encodeURIComponent(query)}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=1&appKey=${key}`;
         const res = await fetch(url, { headers: { appKey: key, Accept: 'application/json' } });
         const data = await res.json();
-        const poi = data.searchPoiInfo?.pois?.[0];
+        // Tmap 응답: searchPoiInfo.pois.poi[] 구조
+        const poi = data.searchPoiInfo?.pois?.poi?.[0];
         if (poi) return { lat: parseFloat(poi.frontLat || poi.noorLat), lon: parseFloat(poi.frontLon || poi.noorLon) };
     } catch {}
     return null;
@@ -109,17 +110,19 @@ export const searchPoiSuggestions = async (query: string): Promise<PoiSuggestion
     try {
         const key = (import.meta.env.VITE_TMAP_APP_KEY || '').trim();
         if (!key) return [];
-        const url = `https://apis.openapi.sk.com/tmap/pois?version=1&searchKeyword=${encodeURIComponent(query)}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=8`;
+        const url = `https://apis.openapi.sk.com/tmap/pois?version=1&searchKeyword=${encodeURIComponent(query)}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=8&appKey=${key}`;
         const res = await fetch(url, { headers: { appKey: key, Accept: 'application/json' } });
         const data = await res.json();
-        const pois: any[] = data.searchPoiInfo?.pois || [];
+        // Tmap 응답: searchPoiInfo.pois.poi[] 구조
+        const pois: any[] = data.searchPoiInfo?.pois?.poi || [];
         return pois.map(poi => ({
             name: poi.name || '',
             address: [poi.middleAddrName, poi.lowerAddrName, poi.roadName].filter(Boolean).join(' '),
             lat: parseFloat(poi.frontLat || poi.noorLat),
             lon: parseFloat(poi.frontLon || poi.noorLon),
         })).filter(p => p.lat && p.lon);
-    } catch {
+    } catch (e) {
+        console.error('POI 검색 오류:', e);
         return [];
     }
 };
