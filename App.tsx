@@ -805,31 +805,25 @@ const App: React.FC = () => {
             <label className="text-lg font-bold text-gray-700 ml-2 flex items-center gap-1">
                 📍 출발지
             </label>
-            <div className="flex space-x-2">
-                <PlaceSearchInput
-                    value={startLoc}
-                    onChange={setStartLoc}
-                    placeholder="지금 있는 곳 검색 (상호명, 건물명…)"
-                    focusBorderClass="focus:border-brandBlue"
-                />
-                <button onClick={() => requireLogin(handleUseCurrentLocation)} className="p-4 bg-blue-50 rounded-2xl text-brandBlue hover:bg-blue-100 transition-colors shrink-0">
-                    <MapPin className="w-6 h-6" />
-                </button>
-            </div>
+            <PlaceSearchInput
+                value={startLoc}
+                onChange={setStartLoc}
+                placeholder="지금 있는 곳 검색 (상호명, 건물명…)"
+                focusBorderClass="focus:border-brandBlue"
+                onGps={() => requireLogin(handleUseCurrentLocation)}
+            />
           </div>
 
           <div className="space-y-2">
             <label className="text-lg font-bold text-gray-700 ml-2 flex items-center gap-1">
                 🏁 도착지
             </label>
-            <div className="flex space-x-2">
-                <PlaceSearchInput
-                    value={endLoc}
-                    onChange={setEndLoc}
-                    placeholder="어디로 갈까? (집, 역명…)"
-                    focusBorderClass="focus:border-brandMint"
-                />
-            </div>
+            <PlaceSearchInput
+                value={endLoc}
+                onChange={setEndLoc}
+                placeholder="어디로 갈까? (집, 역명…)"
+                focusBorderClass="focus:border-brandMint"
+            />
           </div>
 
           <div className="pt-2">

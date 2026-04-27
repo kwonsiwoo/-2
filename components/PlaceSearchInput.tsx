@@ -7,6 +7,7 @@ interface Props {
     onChange: (value: string) => void;
     placeholder?: string;
     focusBorderClass?: string;
+    onGps?: () => void; // 현위치 버튼 (출발지만)
 }
 
 export default function PlaceSearchInput({
@@ -14,6 +15,7 @@ export default function PlaceSearchInput({
     onChange,
     placeholder = '장소, 건물명, 주소',
     focusBorderClass = 'focus:border-brandBlue',
+    onGps,
 }: Props) {
     const [query, setQuery] = useState(value || '');
     const [modalOpen, setModalOpen] = useState(false);
@@ -54,17 +56,28 @@ export default function PlaceSearchInput({
     };
 
     return (
-        <div className="flex-1 flex gap-2">
-            {/* 텍스트 입력 */}
-            <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                placeholder={placeholder}
-                className={`flex-1 bg-gray-50 border-2 border-transparent ${focusBorderClass} focus:bg-white rounded-2xl px-5 py-4 text-gray-800 focus:outline-none transition-all placeholder:text-gray-400 font-medium`}
-            />
+        <div className="w-full flex gap-2">
+            {/* 텍스트 입력 + 현위치 버튼 */}
+            <div className="relative flex-1">
+                <input
+                    ref={inputRef}
+                    type="text"
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                    placeholder={placeholder}
+                    className={`w-full bg-gray-50 border-2 border-transparent ${focusBorderClass} focus:bg-white rounded-2xl px-4 py-4 text-gray-800 focus:outline-none transition-all placeholder:text-gray-400 font-medium ${onGps ? 'pr-12' : ''}`}
+                />
+                {onGps && (
+                    <button
+                        onClick={onGps}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-brandBlue hover:bg-blue-50 rounded-xl transition-colors"
+                        title="현재 위치"
+                    >
+                        <MapPin size={20} />
+                    </button>
+                )}
+            </div>
             {/* 검색 버튼 */}
             <button
                 onClick={handleSearch}
