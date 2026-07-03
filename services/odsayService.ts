@@ -414,6 +414,7 @@ async function buildTypedRoute(
   endLat: number,
   endLng: number,
   endLocName: string,
+  fullTaxiMinutes?: number,
 ): Promise<HybridRoute> {
   const info          = path.info;
   const totalCost     = info.payment || info.totalFare || 0;
@@ -575,11 +576,12 @@ async function buildTypedRoute(
     timeMode,
     taxiBoardingPoint,
     taxiJustification,
+    fullTaxiMinutes,
   };
 }
 
 // ─── 순수 대중교통 경로 빌더 (택시 제외 모드) ────────────────────────────
-async function buildPureRoute(path: any, pathIdx: number, baseMs: number, fullTaxiCost: number): Promise<HybridRoute> {
+async function buildPureRoute(path: any, pathIdx: number, baseMs: number, fullTaxiCost: number, fullTaxiMinutes?: number): Promise<HybridRoute> {
   const info          = path.info;
   const totalCost     = info.payment || info.totalFare || 0;
   const totalDuration = info.totalTime || 0;
@@ -604,6 +606,7 @@ async function buildPureRoute(path: any, pathIdx: number, baseMs: number, fullTa
     taxiWalkCost: 0,
     hybridTotalCost: totalCost,
     hasTaxi: false,
+    fullTaxiMinutes,
   };
 }
 
@@ -686,10 +689,11 @@ export const getOdsayTransitRoutes = async (
     startCoords.lat, startCoords.lon, endCoords.lat, endCoords.lon, baseMs, straightKm,
   );
   const fullTaxiCost = fullTaxiFare.cost;
+  const fullTaxiMinutes = fullTaxiFare.minutes;
 
   if (excludeTaxi) {
     return {
-      routes: await Promise.all(paths.slice(0, 3).map((p, i) => buildPureRoute(p, i, baseMs, fullTaxiCost))),
+      routes: await Promise.all(paths.slice(0, 3).map((p, i) => buildPureRoute(p, i, baseMs, fullTaxiCost, fullTaxiMinutes))),
       fullTaxiCost,
     };
   }
@@ -730,7 +734,7 @@ export const getOdsayTransitRoutes = async (
         strategy, si, baseMs, fullTaxiCost,
         effectiveWalkThreshold, timeMode,
         endCoords.lat, endCoords.lon,
-        endLoc,
+        endLoc, fullTaxiMinutes,
       ),
     ),
   );

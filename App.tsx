@@ -1966,6 +1966,20 @@ const App: React.FC = () => {
                                 <span className="bg-brandMint/10 text-brandMint text-xs font-black px-2.5 py-1 rounded-full border border-brandMint/20">
                                     택시 대비 -{route.savedAmount.toLocaleString()}원
                                 </span>
+                                {route.fullTaxiMinutes != null && (() => {
+                                    const diff = route.totalDuration - route.fullTaxiMinutes;
+                                    if (diff > 0) return (
+                                        <span className="bg-gray-100 text-gray-500 text-xs font-black px-2.5 py-1 rounded-full border border-gray-200">
+                                            택시보다 +{diff}분
+                                        </span>
+                                    );
+                                    if (diff < 0) return (
+                                        <span className="bg-brandMint/10 text-brandMint text-xs font-black px-2.5 py-1 rounded-full border border-brandMint/20">
+                                            택시보다 -{Math.abs(diff)}분 빠름
+                                        </span>
+                                    );
+                                    return null;
+                                })()}
                             </div>
 
                             {/* 택시 탑승 명분 메시지 */}
@@ -2517,6 +2531,20 @@ const App: React.FC = () => {
                     <span className="bg-brandMint/10 text-brandMint text-xs font-black px-2.5 py-1 rounded-full border border-brandMint/20">
                       택시 대비 -{route.savedAmount.toLocaleString()}원
                     </span>
+                    {route.fullTaxiMinutes != null && (() => {
+                      const diff = route.totalDuration - route.fullTaxiMinutes;
+                      if (diff > 0) return (
+                        <span className="bg-gray-100 text-gray-500 text-xs font-black px-2.5 py-1 rounded-full border border-gray-200">
+                          택시보다 +{diff}분
+                        </span>
+                      );
+                      if (diff < 0) return (
+                        <span className="bg-brandMint/10 text-brandMint text-xs font-black px-2.5 py-1 rounded-full border border-brandMint/20">
+                          택시보다 -{Math.abs(diff)}분 빠름
+                        </span>
+                      );
+                      return null;
+                    })()}
                   </div>
                   <div className="flex items-stretch rounded-xl overflow-hidden gap-px">
                     {route.segments.map((seg, idx) => {

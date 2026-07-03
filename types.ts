@@ -26,6 +26,7 @@ export interface HybridRoute {
   departureTime: string;
   transferPoint: string;
   taxiCostOnly: number;
+  fullTaxiMinutes?: number;  // 전액 택시 소요 시간 (비교용)
   // 하이브리드 추가 필드
   transferCount: number;    // 환승 횟수
   walkMinutes: number;      // 총 도보 시간 (택시 대체 전)
