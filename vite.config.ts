@@ -74,12 +74,12 @@ export default defineConfig(({ mode }) => {
                     server.middlewares.use(async (req, res, next) => {
                         const url = req.url || '';
 
-                        // 지하철 실시간 도착
-                        if (url.startsWith('/api/subway')) {
+                        // 지하철 실시간 도착 (subway-timetable은 별도 처리 — 이 핸들러 제외)
+                        if (url.startsWith('/api/subway') && !url.startsWith('/api/subway-timetable')) {
                             const params = new URLSearchParams(url.split('?')[1] || '');
                             const station = params.get('station') || '';
                             try {
-                                const apiUrl = `http://swopenAPI.seoul.go.kr/api/subway/${SEOUL_KEY}/json/realtimeStationArrival/0/5/${encodeURIComponent(station)}`;
+                                const apiUrl = `http://swopenAPI.seoul.go.kr/api/subway/${SEOUL_KEY}/json/realtimeStationArrival/0/20/${encodeURIComponent(station)}`;
                                 const r = await fetch(apiUrl);
                                 const data = await r.json();
                                 res.setHeader('Content-Type', 'application/json');

@@ -105,17 +105,17 @@ export const getSubwayArrivals = async (stationName: string, direction?: string,
     const now = Date.now();
     const rawList: any[] = data.realtimeArrivalList || [];
 
-    // 1단계: 방향 필터 (결과 0이면 전체 폴백)
-    const dirFiltered = direction
-      ? rawList.filter((i: any) => i.updnLine === direction)
+    // 1단계: 노선 필터 (subwayId 우선 — 다노선 혼재 역에서 엉뚱한 노선 제거)
+    // 폴백 없음: 해당 노선 열차 없으면 빈 배열 유지 (다른 노선으로 대체 금지)
+    const lineList = subwayId
+      ? rawList.filter((i: any) => i.subwayId === subwayId)
       : rawList;
-    const afterDir = dirFiltered.length > 0 ? dirFiltered : rawList;
 
-    // 2단계: 노선 필터 (고속터미널 등 다노선 혼재 역 대응, 결과 0이면 폴백)
-    const lineFiltered = subwayId
-      ? afterDir.filter((i: any) => i.subwayId === subwayId)
-      : afterDir;
-    const dirList = lineFiltered.length > 0 ? lineFiltered : afterDir;
+    // 2단계: 방향 필터 (결과 0이면 같은 노선 내 전체 폴백)
+    const dirFiltered = direction
+      ? lineList.filter((i: any) => i.updnLine === direction)
+      : lineList;
+    const dirList = dirFiltered.length > 0 ? dirFiltered : lineList;
 
     const candidates = dirList.slice(0, 20);
     const mapped = candidates.map((item: any) => {
