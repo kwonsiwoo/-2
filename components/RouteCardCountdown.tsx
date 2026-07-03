@@ -61,12 +61,17 @@ const RouteCardCountdown: React.FC<Props> = ({ firstTransitSeg, walkMinutes, rou
   const leaveInSecs = leaveInMs !== null ? Math.max(0, Math.floor(leaveInMs / 1000)) : null;
 
   const isSubway = firstTransitSeg?.type === 'subway';
+  const isBus = firstTransitSeg?.type === 'bus';
 
-  // ─── 지하철 아닌 경우 (버스·택시·도보) ──────────────────────────────
+  // ─── 버스·택시·도보 첫 탑승 ──────────────────────────────────────────
   if (!isSubway) {
+    const transitIcon = isBus ? '🚌' : firstTransitSeg?.type === 'taxi' ? '🚕' : '🚶';
+    const transitLabel = isBus ? (firstTransitSeg?.lineName || '버스') : firstTransitSeg?.type === 'taxi' ? '택시' : '도보';
+    const comment = getComment(999, routeIndex);
     return (
-      <div className="space-y-2">
-        <div className="rounded-2xl px-4 py-3 flex items-center gap-3 bg-blue-50">
+      <div className="space-y-0">
+        {/* 코멘트 배너 */}
+        <div className="rounded-2xl px-4 py-3 flex items-center gap-3 bg-blue-50 mb-3">
           <Clock className="w-4 h-4 shrink-0 text-brandBlue" />
           <div className="min-w-0">
             <p className="text-[11px] text-gray-500 font-bold">
@@ -74,7 +79,27 @@ const RouteCardCountdown: React.FC<Props> = ({ firstTransitSeg, walkMinutes, rou
                 ? <>도보 <span className="font-black text-gray-800">{walkMinutes}분</span> 후 탑승</>
                 : <span className="font-black text-gray-800">바로 탑승 가능</span>}
             </p>
-            <p className="text-sm font-black text-brandBlue truncate">"{getComment(999, routeIndex)}"</p>
+            <p className="text-sm font-black text-brandBlue truncate">"{comment}"</p>
+          </div>
+        </div>
+        {/* 탑승 수단 + 도보 시간 정보 박스 */}
+        <div className="rounded-xl bg-gray-50 px-3 py-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-base">{transitIcon}</span>
+            <div>
+              <p className="text-[10px] text-gray-400 font-bold">첫 탑승 수단</p>
+              <p className="text-sm font-black text-gray-800">{transitLabel}</p>
+            </div>
+          </div>
+          <div className="h-8 w-px bg-gray-200" />
+          <div className="flex items-center gap-1.5">
+            <span className="text-base">🚶</span>
+            <div>
+              <p className="text-[10px] text-gray-400 font-bold">정류장까지 도보</p>
+              <p className="text-sm font-black text-gray-800">
+                {walkMinutes > 0 ? `${walkMinutes}분` : '바로'}
+              </p>
+            </div>
           </div>
         </div>
       </div>
