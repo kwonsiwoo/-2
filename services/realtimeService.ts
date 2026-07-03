@@ -111,11 +111,12 @@ export const getSubwayArrivals = async (stationName: string, direction?: string,
       ? rawList.filter((i: any) => i.subwayId === subwayId)
       : rawList;
 
-    // 2단계: 방향 필터 (결과 0이면 같은 노선 내 전체 폴백)
-    const dirFiltered = direction
+    // 2단계: 방향 필터 — 폴백 없음
+    // direction이 있으면 정확히 그 방향만. 없으면 해당 노선 전체.
+    // 방향 미매칭 시 다른 방향 열차 표시 금지 (2호선 내선↔외선 혼동 방지)
+    const dirList = direction
       ? lineList.filter((i: any) => i.updnLine === direction)
       : lineList;
-    const dirList = dirFiltered.length > 0 ? dirFiltered : lineList;
 
     const candidates = dirList.slice(0, 20);
     const mapped = candidates.map((item: any) => {
