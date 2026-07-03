@@ -21,10 +21,10 @@ function getComment(leaveInMins: number, routeIndex: number): string {
 }
 
 const RouteCardCountdown: React.FC<Props> = ({ firstTransitSeg, walkMinutes, routeIndex }) => {
-  // 다음 열차 도착 예정 epoch ms (실시간 API 기반)
   const [nextTransitMs, setNextTransitMs] = useState<number | null>(null);
+  const [trainArrivalTime, setTrainArrivalTime] = useState<string | null>(null); // "HH:MM"
+  const [trainMinutesLeft, setTrainMinutesLeft] = useState<number | null>(null); // 열차까지 남은 분
   const [loading, setLoading] = useState(firstTransitSeg?.type === 'subway');
-  // 매 5초 tick → 카운트다운 재계산
   const [, setTick] = useState(0);
 
   const fetchRealtime = useCallback(async () => {
@@ -34,29 +34,29 @@ const RouteCardCountdown: React.FC<Props> = ({ firstTransitSeg, walkMinutes, rou
     const sid = lineNameToSubwayId(firstTransitSeg.lineName || '') || undefined;
     const arrivals = await getSubwayArrivals(clean, dir, sid);
     if (arrivals.length > 0) {
-      setNextTransitMs(Date.now() + arrivals[0].minutesLeft * 60000);
+      const first = arrivals[0];
+      setNextTransitMs(Date.now() + first.minutesLeft * 60000);
+      setTrainArrivalTime(first.arrivalTime || null);
+      setTrainMinutesLeft(first.minutesLeft);
     }
     setLoading(false);
   }, [firstTransitSeg?.type, firstTransitSeg?.startName, firstTransitSeg?.nextStationName]);
 
-  // 실시간 API 30초마다 갱신
   useEffect(() => {
     fetchRealtime();
     const id = setInterval(fetchRealtime, 30000);
     return () => clearInterval(id);
   }, [fetchRealtime]);
 
-  // 5초마다 tick → 카운트다운 숫자 갱신
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 5000);
     return () => clearInterval(id);
   }, []);
 
-  // 현재 남은 시간 계산 (tick에 의해 재계산)
+  // 출발까지 남은 시간 = 열차 도착 - 지금 - 도보 시간
   const leaveInMs = nextTransitMs !== null
     ? nextTransitMs - Date.now() - walkMinutes * 60000
     : null;
-
   const leaveInMins = leaveInMs !== null ? Math.round(leaveInMs / 60000) : null;
   const leaveInSecs = leaveInMs !== null ? Math.max(0, Math.floor(leaveInMs / 1000)) : null;
 
@@ -89,15 +89,6 @@ const RouteCardCountdown: React.FC<Props> = ({ firstTransitSeg, walkMinutes, rou
           <div className="w-4 h-4 border-2 border-gray-200 border-t-brandBlue rounded-full animate-spin shrink-0" />
           <p className="text-xs text-gray-400 font-bold">실시간 열차 조회 중...</p>
         </div>
-        <div className="border-t border-gray-100 pt-4">
-          <p className="text-[10px] text-gray-400 font-bold mb-1">
-            첫 탑승까지{walkMinutes > 0 ? ` (도보 ${walkMinutes}분 소요)` : ''}
-          </p>
-          <div className="flex items-center gap-2 text-gray-300 font-mono font-bold text-xl">
-            <Clock className="w-5 h-5" />
-            <span>--분 --초</span>
-          </div>
-        </div>
       </div>
     );
   }
@@ -122,7 +113,7 @@ const RouteCardCountdown: React.FC<Props> = ({ firstTransitSeg, walkMinutes, rou
   return (
     <div className="space-y-0">
       {/* 긴박도 배너 */}
-      <div className={`rounded-2xl px-4 py-3 flex items-center gap-3 mb-4 ${urgent ? 'bg-red-50' : 'bg-blue-50'}`}>
+      <div className={`rounded-2xl px-4 py-3 flex items-center gap-3 mb-3 ${urgent ? 'bg-red-50' : 'bg-blue-50'}`}>
         <Clock className={`w-4 h-4 shrink-0 ${urgent ? 'text-red-500 animate-pulse' : 'text-brandBlue'}`} />
         <div className="min-w-0">
           <p className="text-[11px] text-gray-500 font-bold">
@@ -136,10 +127,42 @@ const RouteCardCountdown: React.FC<Props> = ({ firstTransitSeg, walkMinutes, rou
         </div>
       </div>
 
+      {/* 열차 정보 + 도보 시간 */}
+      <div className="rounded-xl bg-gray-50 px-3 py-2.5 flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-base">🚇</span>
+          <div>
+            <p className="text-[10px] text-gray-400 font-bold">다음 열차</p>
+            <p className="text-sm font-black text-gray-800">
+              {trainArrivalTime
+                ? <>{trainArrivalTime} 도착</>
+                : '--:-- 도착'}
+            </p>
+          </div>
+        </div>
+        <div className="h-8 w-px bg-gray-200" />
+        <div className="text-center">
+          <p className="text-[10px] text-gray-400 font-bold">열차까지</p>
+          <p className="text-sm font-black text-brandMint">
+            {trainMinutesLeft !== null ? `${trainMinutesLeft}분 후` : '--분 후'}
+          </p>
+        </div>
+        <div className="h-8 w-px bg-gray-200" />
+        <div className="flex items-center gap-1.5">
+          <span className="text-base">🚶</span>
+          <div>
+            <p className="text-[10px] text-gray-400 font-bold">역까지 도보</p>
+            <p className="text-sm font-black text-gray-800">
+              {walkMinutes > 0 ? `${walkMinutes}분` : '바로'}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* 초 단위 카운트다운 */}
-      <div className="border-t border-gray-100 pt-4">
+      <div className="border-t border-gray-100 pt-3">
         <p className="text-[10px] text-gray-400 font-bold mb-1">
-          출발까지{walkMinutes > 0 ? ` (도보 ${walkMinutes}분 포함)` : ''}
+          지금 출발해야 할 시간까지{walkMinutes > 0 ? ` (도보 ${walkMinutes}분 포함)` : ''}
         </p>
         <div className={`flex items-center gap-2 font-mono font-bold text-xl ${urgent ? 'text-red-500 animate-pulse' : 'text-brandBlue'}`}>
           <Clock className="w-5 h-5" />
