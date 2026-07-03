@@ -63,14 +63,15 @@ const RouteCardCountdown: React.FC<Props> = ({ firstTransitSeg, walkMinutes, rou
   const isSubway = firstTransitSeg?.type === 'subway';
   const isBus = firstTransitSeg?.type === 'bus';
 
-  // ─── 버스·택시·도보 첫 탑승 ──────────────────────────────────────────
+  // ─── 버스·택시 첫 탑승: 지하철과 동일한 레이아웃, 실시간 미제공 ──────
   if (!isSubway) {
     const transitIcon = isBus ? '🚌' : firstTransitSeg?.type === 'taxi' ? '🚕' : '🚶';
-    const transitLabel = isBus ? (firstTransitSeg?.lineName || '버스') : firstTransitSeg?.type === 'taxi' ? '택시' : '도보';
+    const transitName = isBus ? (firstTransitSeg?.lineName || '버스') : firstTransitSeg?.type === 'taxi' ? '택시' : '도보';
+    const stopLabel = isBus ? '정류장까지 도보' : '목적지까지 도보';
     const comment = getComment(999, routeIndex);
     return (
       <div className="space-y-0">
-        {/* 코멘트 배너 */}
+        {/* 긴박도 배너 */}
         <div className="rounded-2xl px-4 py-3 flex items-center gap-3 bg-blue-50 mb-3">
           <Clock className="w-4 h-4 shrink-0 text-brandBlue" />
           <div className="min-w-0">
@@ -82,24 +83,39 @@ const RouteCardCountdown: React.FC<Props> = ({ firstTransitSeg, walkMinutes, rou
             <p className="text-sm font-black text-brandBlue truncate">"{comment}"</p>
           </div>
         </div>
-        {/* 탑승 수단 + 도보 시간 정보 박스 */}
-        <div className="rounded-xl bg-gray-50 px-3 py-2.5 flex items-center justify-between">
+        {/* 탑승 수단 + 시간 + 도보 정보 박스 */}
+        <div className="rounded-xl bg-gray-50 px-3 py-2.5 flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <span className="text-base">{transitIcon}</span>
             <div>
-              <p className="text-[10px] text-gray-400 font-bold">첫 탑승 수단</p>
-              <p className="text-sm font-black text-gray-800">{transitLabel}</p>
+              <p className="text-[10px] text-gray-400 font-bold">첫 탑승</p>
+              <p className="text-sm font-black text-gray-800">{transitName}</p>
             </div>
+          </div>
+          <div className="h-8 w-px bg-gray-200" />
+          <div className="text-center">
+            <p className="text-[10px] text-gray-400 font-bold">탑승까지</p>
+            <p className="text-sm font-black text-gray-400">실시간 미제공</p>
           </div>
           <div className="h-8 w-px bg-gray-200" />
           <div className="flex items-center gap-1.5">
             <span className="text-base">🚶</span>
             <div>
-              <p className="text-[10px] text-gray-400 font-bold">정류장까지 도보</p>
+              <p className="text-[10px] text-gray-400 font-bold">{stopLabel}</p>
               <p className="text-sm font-black text-gray-800">
                 {walkMinutes > 0 ? `${walkMinutes}분` : '바로'}
               </p>
             </div>
+          </div>
+        </div>
+        {/* 카운트다운 자리 — 실시간 없으므로 도보 안내로 대체 */}
+        <div className="border-t border-gray-100 pt-3">
+          <p className="text-[10px] text-gray-400 font-bold mb-1">
+            지금 출발해야 할 시간까지{walkMinutes > 0 ? ` (도보 ${walkMinutes}분 포함)` : ''}
+          </p>
+          <div className="flex items-center gap-2 font-mono font-bold text-xl text-gray-300">
+            <Clock className="w-5 h-5" />
+            <span>실시간 정보 없음</span>
           </div>
         </div>
       </div>
