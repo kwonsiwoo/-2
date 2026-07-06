@@ -1943,6 +1943,13 @@ const App: React.FC = () => {
                                 </button>
                             </div>
 
+                            {/* 경로 비교 메모 */}
+                            {route.comparisonNote && (
+                                <p className="text-[11px] font-bold text-gray-400 mb-3 -mt-2">
+                                    {route.comparisonNote}
+                                </p>
+                            )}
+
                             {/* 시간 + 도착 */}
                             <div className="flex items-end justify-between mb-3">
                                 <div>
@@ -2316,12 +2323,15 @@ const App: React.FC = () => {
              </div>
 
              <div className="p-6">
-                 <div className="flex justify-between items-start mb-4 mt-2">
+                 <div className="flex justify-between items-start mb-2 mt-2">
                      <h3 className="text-2xl font-black text-gray-800 leading-tight">{selectedRoute.name}</h3>
                      <span className="bg-brandMint text-white text-xs font-black px-3 py-1 rounded-full whitespace-nowrap">
                         {selectedRoute.savedAmount.toLocaleString()}원 절약
                      </span>
                  </div>
+                 {selectedRoute.comparisonNote && (
+                     <p className="text-[11px] font-bold text-gray-400 mb-4">{selectedRoute.comparisonNote}</p>
+                 )}
                  <div className="flex items-center gap-4 text-gray-600 font-bold mb-6">
                      <div className="flex items-center gap-1">
                          <Clock size={18} className="text-brandBlue"/>
@@ -2502,7 +2512,7 @@ const App: React.FC = () => {
                 className="bg-white rounded-[2rem] overflow-hidden border-l-4 border border-gray-100 cursor-pointer shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
                 style={{ borderLeftColor: accent }}>
                 <div className="p-5">
-                  <div className="flex items-center gap-2 flex-wrap mb-4">
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
                     <span className="text-white text-[11px] font-black px-3 py-1 rounded-full shadow-sm" style={{ backgroundColor: accent }}>
                       {route.routeLabel ?? `막차 ${index + 1}`}
                     </span>
@@ -2511,6 +2521,9 @@ const App: React.FC = () => {
                     )}
                     <span className="text-xs font-bold text-gray-400">🚏 {route.transferPoint}</span>
                   </div>
+                  {route.comparisonNote && (
+                    <p className="text-[11px] font-bold text-gray-400 mb-3">{route.comparisonNote}</p>
+                  )}
                   <div className="flex items-end justify-between mb-3">
                     <div>
                       <p className="text-[10px] text-gray-400 font-bold mb-0.5">총 소요시간</p>

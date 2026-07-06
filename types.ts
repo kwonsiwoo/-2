@@ -43,6 +43,11 @@ export interface HybridRoute {
   timeMode?: 'day' | 'night';   // 경로 산출 시점의 시간대
   taxiBoardingPoint?: string;   // 택시 탑승 지점명
   taxiJustification?: string;   // 이 지점에서 택시를 타야 하는 이유 한 문장
+  comparisonNote?: string;      // 다른 경로 대비 트레이드오프 한 줄 (예: "알뜰형보다 8분 빠름 · 3,200원 더 비쌈")
+  destLat?: number;             // 실제 목적지 위도
+  destLng?: number;             // 실제 목적지 경도
+  origLat?: number;             // 실제 출발지 위도
+  origLng?: number;             // 실제 출발지 경도
 }
 
 export interface Place {

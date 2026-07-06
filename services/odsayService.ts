@@ -1,5 +1,5 @@
 import { HybridRoute, RouteSegment } from '../types';
-import { getCoordinates, getDrivingDistance, getWalkingRoute, isOutsideSeoul } from './tmapService';
+import { getCoordinates, getDrivingDistance, getDrivingRoutePath, getWalkingRoute, getWalkingRoutePath, isOutsideSeoul } from './tmapService';
 import { isPathRunnable } from './transitScheduleService';
 
 type HybridStrategy = 'time-saving' | 'cost-saving' | 'balanced';
@@ -335,17 +335,22 @@ async function buildSegments(path: any, baseMs: number): Promise<RouteSegment[]>
     }
   });
 
-  // 도보 구간은 Tmap 보행자 길찾기로 실제 소요시간 보정 (좌표 있을 때만, 실패 시 ODsay 추정치 유지)
+  // 도보 구간: Tmap 보행자 길찾기로 실제 소요시간 + 경로 좌표 보정
   await Promise.all(rawSegs.map(async (seg) => {
     if (seg.type !== 'walk') return;
     const sLat = Number(seg.sub.startY), sLng = Number(seg.sub.startX);
     const eLat = Number(seg.sub.endY),   eLng = Number(seg.sub.endX);
     if (!sLat || !sLng || !eLat || !eLng) return;
     const walking = await getWalkingRoute(sLat, sLng, eLat, eLng);
-    if (walking) seg.duration = Math.max(1, Math.round(walking.durationSec / 60));
+    if (walking) {
+      seg.duration = Math.max(1, Math.round(walking.durationSec / 60));
+      // getWalkingRoutePath 는 캐시 히트이므로 추가 API 호출 없음
+      const walkPath = await getWalkingRoutePath(sLat, sLng, eLat, eLng);
+      if (walkPath.length >= 2) seg.walkPath = walkPath;
+    }
   }));
 
-  return rawSegs.map(({ type, duration, lineName, busNos, startName, endName, sub }) => {
+  return rawSegs.map(({ type, duration, lineName, busNos, startName, endName, sub, walkPath }: any) => {
     let instruction = '';
     let alightInstruction: string | undefined;
 
@@ -365,12 +370,18 @@ async function buildSegments(path: any, baseMs: number): Promise<RouteSegment[]>
 
     const stations: any[] = sub.passStopList?.stations || [];
     const segPath: { lat: number; lng: number }[] = [];
-    stations.forEach((s: any) => {
-      if (s.x && s.y) segPath.push({ lat: Number(s.y), lng: Number(s.x) });
-    });
-    if (segPath.length === 0 && sub.startX && sub.startY) {
-      segPath.push({ lat: Number(sub.startY), lng: Number(sub.startX) });
-      segPath.push({ lat: Number(sub.endY),   lng: Number(sub.endX) });
+
+    // 도보 구간: Tmap 실제 경로 우선, 없으면 직선 fallback
+    if (type === 'walk' && walkPath?.length >= 2) {
+      segPath.push(...walkPath);
+    } else {
+      stations.forEach((s: any) => {
+        if (s.x && s.y) segPath.push({ lat: Number(s.y), lng: Number(s.x) });
+      });
+      if (segPath.length === 0 && sub.startX && sub.startY) {
+        segPath.push({ lat: Number(sub.startY), lng: Number(sub.startX) });
+        segPath.push({ lat: Number(sub.endY),   lng: Number(sub.endX) });
+      }
     }
 
     // 진행 방향 다음 역: passStopList[0]=승차역, [1]=바로 다음 역
@@ -411,6 +422,8 @@ async function buildTypedRoute(
   fullTaxiCost: number,
   walkThreshold: number,
   timeMode: TimeMode,
+  startLat: number,
+  startLng: number,
   endLat: number,
   endLng: number,
   endLocName: string,
@@ -511,6 +524,8 @@ async function buildTypedRoute(
           (lastKept ? baseSegments.slice(0, tp.subPathIdx + 1).reduce((s, seg) => s + seg.durationMinutes, 0) : 0)
           + refinedFare.minutes,
         ),
+        path: await getDrivingRoutePath(tp.boardingLat, tp.boardingLng, endLat, endLng)
+              .then(p => p.length >= 2 ? p : [{ lat: tp.boardingLat, lng: tp.boardingLng }, { lat: endLat, lng: endLng }]),
       };
 
       hybridSegments = [...keptSegs, taxiSegment];
@@ -577,11 +592,15 @@ async function buildTypedRoute(
     taxiBoardingPoint,
     taxiJustification,
     fullTaxiMinutes,
+    destLat: endLat,
+    destLng: endLng,
+    origLat: startLat,
+    origLng: startLng,
   };
 }
 
 // ─── 순수 대중교통 경로 빌더 (택시 제외 모드) ────────────────────────────
-async function buildPureRoute(path: any, pathIdx: number, baseMs: number, fullTaxiCost: number, fullTaxiMinutes?: number): Promise<HybridRoute> {
+async function buildPureRoute(path: any, pathIdx: number, baseMs: number, fullTaxiCost: number, fullTaxiMinutes?: number, endLat?: number, endLng?: number, startLat?: number, startLng?: number): Promise<HybridRoute> {
   const info          = path.info;
   const totalCost     = info.payment || info.totalFare || 0;
   const totalDuration = info.totalTime || 0;
@@ -607,7 +626,113 @@ async function buildPureRoute(path: any, pathIdx: number, baseMs: number, fullTa
     hybridTotalCost: totalCost,
     hasTaxi: false,
     fullTaxiMinutes,
+    destLat: endLat,
+    destLng: endLng,
+    origLat: startLat,
+    origLng: startLng,
   };
+}
+
+// ─── 경로 후처리: 실제 값 기준 레이블 재배정 + 유사 경로 중복 제거 ──────────
+function postProcessRoutes(routes: HybridRoute[]): HybridRoute[] {
+  if (routes.length === 0) return routes;
+
+  // 1. 유사 경로 중복 제거: 시간 5분 이내 + 비용 500원 이내면 동일 경로로 간주
+  const unique: HybridRoute[] = [];
+  for (const r of routes) {
+    if (!unique.some(u =>
+      Math.abs(r.totalDuration - u.totalDuration) <= 5 &&
+      Math.abs(r.hybridTotalCost - u.hybridTotalCost) <= 500,
+    )) unique.push(r);
+  }
+  if (unique.length === 0) return routes;
+
+  // 2. 실제 값 기준 최고 순위 경로 결정
+  const byTime = [...unique].sort((a, b) => a.totalDuration - b.totalDuration);
+  const byCost = [...unique].sort((a, b) => a.hybridTotalCost - b.hybridTotalCost);
+  const fastest  = byTime[0];
+  const cheapest = byCost[0];
+
+  // timeMode 계승 (배열 안에서 첫 번째 경로 기준)
+  const timeMode = (unique[0].timeMode ?? 'day') as 'day' | 'night';
+  const labels = {
+    fast:      timeMode === 'night' ? '🌙 최대 체류형'        : '⚡ 빠른 귀가형',
+    cheap:     timeMode === 'night' ? '💰 알뜰 막차형'        : '💰 알뜰 귀가형',
+    balanced:  timeMode === 'night' ? '⚖️ 스마트 막차형'     : '⚖️ 밸런스형',
+    optimal:   timeMode === 'night' ? '✨ 최적 막차형'        : '✨ 최적 귀가형',
+  };
+
+  const isSame = fastest.id === cheapest.id;
+
+  const result = unique.map(route => {
+    const isFastest  = route.id === fastest.id;
+    const isCheapest = route.id === cheapest.id;
+
+    if (isFastest && isCheapest) {
+      // 가장 빠르고 동시에 가장 저렴 → 최적 경로 단일 레이블
+      return {
+        ...route,
+        name: labels.optimal,
+        routeType: 'time-saving' as const,
+        routeLabel: labels.optimal,
+        comparisonNote: '시간·비용 모두 최적',
+      };
+    }
+
+    if (isFastest && !isSame) {
+      const timeDiff = cheapest.totalDuration - route.totalDuration;
+      const costDiff = route.hybridTotalCost - cheapest.hybridTotalCost;
+      const parts: string[] = [];
+      if (timeDiff > 0) parts.push(`알뜰형보다 ${timeDiff}분 빠름`);
+      if (costDiff > 0) parts.push(`${costDiff.toLocaleString()}원 더 비쌈`);
+      return {
+        ...route,
+        name: labels.fast,
+        routeType: 'time-saving' as const,
+        routeLabel: labels.fast,
+        comparisonNote: parts.length > 0 ? parts.join(' · ') : undefined,
+      };
+    }
+
+    if (isCheapest && !isSame) {
+      const timeDiff = route.totalDuration - fastest.totalDuration;
+      const costDiff = fastest.hybridTotalCost - route.hybridTotalCost;
+      const parts: string[] = [];
+      if (timeDiff > 0) parts.push(`빠른형보다 ${timeDiff}분 더 걸림`);
+      if (costDiff > 0) parts.push(`${costDiff.toLocaleString()}원 절약`);
+      return {
+        ...route,
+        name: labels.cheap,
+        routeType: 'cost-saving' as const,
+        routeLabel: labels.cheap,
+        comparisonNote: parts.length > 0 ? parts.join(' · ') : undefined,
+      };
+    }
+
+    // 밸런스형 (fastest도 cheapest도 아닌 나머지)
+    const timeDiff = route.totalDuration - fastest.totalDuration;
+    const costDiff = route.hybridTotalCost - cheapest.hybridTotalCost;
+    const parts: string[] = [];
+    if (timeDiff > 0) parts.push(`빠른형보다 ${timeDiff}분`);
+    if (costDiff > 0) parts.push(`${costDiff.toLocaleString()}원 더 비쌈`);
+    return {
+      ...route,
+      name: labels.balanced,
+      routeType: 'balanced' as const,
+      routeLabel: labels.balanced,
+      comparisonNote: parts.length > 0 ? parts.join(' · ') : undefined,
+    };
+  });
+
+  // 3. 정렬: 빠른형 → 알뜰형 → 밸런스형 (최적형은 맨 앞)
+  const typeOrder: Record<string, number> = {
+    'time-saving': 0,
+    'cost-saving': 1,
+    'balanced':    2,
+  };
+  return result.sort((a, b) =>
+    (typeOrder[a.routeType ?? 'balanced'] ?? 2) - (typeOrder[b.routeType ?? 'balanced'] ?? 2),
+  );
 }
 
 // ─── 공개 API ─────────────────────────────────────────────────────────────
@@ -692,10 +817,8 @@ export const getOdsayTransitRoutes = async (
   const fullTaxiMinutes = fullTaxiFare.minutes;
 
   if (excludeTaxi) {
-    return {
-      routes: await Promise.all(paths.slice(0, 3).map((p, i) => buildPureRoute(p, i, baseMs, fullTaxiCost, fullTaxiMinutes))),
-      fullTaxiCost,
-    };
+    const pureRoutes = await Promise.all(paths.slice(0, 3).map((p, i) => buildPureRoute(p, i, baseMs, fullTaxiCost, fullTaxiMinutes, endCoords.lat, endCoords.lon, startCoords.lat, startCoords.lon)));
+    return { routes: postProcessRoutes(pureRoutes), fullTaxiCost };
   }
 
   const timeMode = detectTimeMode(baseMs);
@@ -733,11 +856,12 @@ export const getOdsayTransitRoutes = async (
         chosen[si],
         strategy, si, baseMs, fullTaxiCost,
         effectiveWalkThreshold, timeMode,
+        startCoords.lat, startCoords.lon,
         endCoords.lat, endCoords.lon,
         endLoc, fullTaxiMinutes,
       ),
     ),
   );
 
-  return { routes, fullTaxiCost };
+  return { routes: postProcessRoutes(routes), fullTaxiCost };
 };

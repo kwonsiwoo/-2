@@ -158,15 +158,15 @@ export const reverseGeocode = async (lat: number, lon: number): Promise<string> 
     return `현재위치`;
 };
 
-// ─── 실제 도로 주행 거리/시간 (택시 요금 산출용) ──────────────────────────
-const drivingCache = new Map<string, { distanceM: number; durationSec: number }>();
+// ─── 실제 도로 주행 거리/시간 + 경로 좌표 (택시 요금/폴리라인 산출용) ──────
+type DrivingResult = { distanceM: number; durationSec: number; path: { lat: number; lng: number }[] };
+const drivingCache = new Map<string, DrivingResult>();
 
-export const getDrivingDistance = async (
+async function fetchDrivingRoute(
     startLat: number, startLon: number, endLat: number, endLon: number,
-): Promise<{ distanceM: number; durationSec: number } | null> => {
+): Promise<DrivingResult | null> {
     const key = `${startLat.toFixed(5)},${startLon.toFixed(5)}->${endLat.toFixed(5)},${endLon.toFixed(5)}`;
     if (drivingCache.has(key)) return drivingCache.get(key)!;
-
     try {
         const appKey = (import.meta.env.VITE_TMAP_APP_KEY || '').trim();
         if (!appKey) return null;
@@ -174,42 +174,54 @@ export const getDrivingDistance = async (
             method: 'POST',
             headers: { appKey, 'Content-Type': 'application/json', Accept: 'application/json' },
             body: JSON.stringify({
-                startX: String(startLon),
-                startY: String(startLat),
-                endX: String(endLon),
-                endY: String(endLat),
-                reqCoordType: 'WGS84GEO',
-                resCoordType: 'WGS84GEO',
-                searchOption: '0',
+                startX: String(startLon), startY: String(startLat),
+                endX: String(endLon),   endY: String(endLat),
+                reqCoordType: 'WGS84GEO', resCoordType: 'WGS84GEO', searchOption: '0',
             }),
         });
         const data = await res.json();
         const features: any[] = data.features || [];
         let distanceM: number | undefined;
         let durationSec: number | undefined;
+        const path: { lat: number; lng: number }[] = [];
         for (const f of features) {
             if (distanceM == null && f.properties?.totalDistance != null) distanceM = Number(f.properties.totalDistance);
             if (durationSec == null && f.properties?.totalTime != null) durationSec = Number(f.properties.totalTime);
-            if (distanceM != null && durationSec != null) break;
+            if (f.geometry?.type === 'LineString') {
+                for (const [lon, lat] of (f.geometry.coordinates as number[][])) {
+                    path.push({ lat: Number(lat), lng: Number(lon) });
+                }
+            }
         }
         if (distanceM != null && durationSec != null) {
-            const result = { distanceM, durationSec };
+            const result: DrivingResult = { distanceM, durationSec, path };
             drivingCache.set(key, result);
             return result;
         }
     } catch {}
     return null;
+}
+
+export const getDrivingDistance = async (
+    startLat: number, startLon: number, endLat: number, endLon: number,
+): Promise<{ distanceM: number; durationSec: number } | null> => fetchDrivingRoute(startLat, startLon, endLat, endLon);
+
+export const getDrivingRoutePath = async (
+    startLat: number, startLon: number, endLat: number, endLon: number,
+): Promise<{ lat: number; lng: number }[]> => {
+    const r = await fetchDrivingRoute(startLat, startLon, endLat, endLon);
+    return r?.path ?? [];
 };
 
-// ─── 실제 보행 거리/시간 (도보 구간 정확도 산출용) ─────────────────────────
-const walkingCache = new Map<string, { distanceM: number; durationSec: number }>();
+// ─── 실제 보행 거리/시간 + 경로 좌표 (도보 구간 정확도 + 폴리라인용) ──────
+type WalkingResult = { distanceM: number; durationSec: number; path: { lat: number; lng: number }[] };
+const walkingCache = new Map<string, WalkingResult>();
 
-export const getWalkingRoute = async (
+async function fetchWalkingRoute(
     startLat: number, startLon: number, endLat: number, endLon: number,
-): Promise<{ distanceM: number; durationSec: number } | null> => {
+): Promise<WalkingResult | null> {
     const key = `${startLat.toFixed(5)},${startLon.toFixed(5)}->${endLat.toFixed(5)},${endLon.toFixed(5)}`;
     if (walkingCache.has(key)) return walkingCache.get(key)!;
-
     try {
         const appKey = (import.meta.env.VITE_TMAP_APP_KEY || '').trim();
         if (!appKey) return null;
@@ -217,33 +229,44 @@ export const getWalkingRoute = async (
             method: 'POST',
             headers: { appKey, 'Content-Type': 'application/json', Accept: 'application/json' },
             body: JSON.stringify({
-                startX: String(startLon),
-                startY: String(startLat),
-                endX: String(endLon),
-                endY: String(endLat),
-                startName: '출발',
-                endName: '도착',
-                reqCoordType: 'WGS84GEO',
-                resCoordType: 'WGS84GEO',
-                searchOption: '0',
+                startX: String(startLon), startY: String(startLat),
+                endX: String(endLon),   endY: String(endLat),
+                startName: '출발', endName: '도착',
+                reqCoordType: 'WGS84GEO', resCoordType: 'WGS84GEO', searchOption: '0',
             }),
         });
         const data = await res.json();
         const features: any[] = data.features || [];
         let distanceM: number | undefined;
         let durationSec: number | undefined;
+        const path: { lat: number; lng: number }[] = [];
         for (const f of features) {
             if (distanceM == null && f.properties?.totalDistance != null) distanceM = Number(f.properties.totalDistance);
             if (durationSec == null && f.properties?.totalTime != null) durationSec = Number(f.properties.totalTime);
-            if (distanceM != null && durationSec != null) break;
+            if (f.geometry?.type === 'LineString') {
+                for (const [lon, lat] of (f.geometry.coordinates as number[][])) {
+                    path.push({ lat: Number(lat), lng: Number(lon) });
+                }
+            }
         }
         if (distanceM != null && durationSec != null) {
-            const result = { distanceM, durationSec };
+            const result: WalkingResult = { distanceM, durationSec, path };
             walkingCache.set(key, result);
             return result;
         }
     } catch {}
     return null;
+}
+
+export const getWalkingRoute = async (
+    startLat: number, startLon: number, endLat: number, endLon: number,
+): Promise<{ distanceM: number; durationSec: number } | null> => fetchWalkingRoute(startLat, startLon, endLat, endLon);
+
+export const getWalkingRoutePath = async (
+    startLat: number, startLon: number, endLat: number, endLon: number,
+): Promise<{ lat: number; lng: number }[]> => {
+    const r = await fetchWalkingRoute(startLat, startLon, endLat, endLon);
+    return r?.path ?? [];
 };
 
 // ─── 좌표가 서울시 경계 내부인지 판별 (시계외 할증 산출용, 근사 bbox) ──────
