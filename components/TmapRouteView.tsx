@@ -73,8 +73,6 @@ async function fetchWalkPathDirect(
         }
       }
     }
-    const types = (data.features || []).map((f: any) => f.geometry?.type).join(',');
-    console.log('[도보경로]', key, `→ features:${(data.features||[]).length} types:[${types}] points:${path.length}`);
     walkPathCache.set(key, path);
     return path;
   } catch (e) {

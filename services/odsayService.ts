@@ -386,15 +386,9 @@ async function buildSegments(path: any, baseMs: number): Promise<RouteSegment[]>
 
     // 진행 방향 다음 역: passStopList[0]=승차역, [1]=바로 다음 역
     // 반대 방향 열차는 arvlMsg3에 이 역 이름이 들어있으므로 실시간 필터에 사용
-    if (type === 'subway' && stations.length > 0) {
-      console.log('[ODsay passStopList] stations[0..2]:', JSON.stringify(stations.slice(0, 3)));
-    }
     const nextStationName = stations.length >= 2
       ? (stations[1].stationName || stations[1].stationNm || stations[1].name || '').replace(/역$/, '').trim()
       : '';
-    if (type === 'subway') {
-      console.log('[방향필터] startName:', startName, '→ nextStationName:', nextStationName, '| wayCode:', sub.wayCode);
-    }
 
     const dep = toHHMM(elapsed);
     elapsed += duration;
@@ -762,7 +756,6 @@ export const getOdsayTransitRoutes = async (
 
   const res  = await fetch(url);
   const data = await res.json();
-  console.log('ODsay 경로 탐색 응답:', JSON.stringify(data).slice(0, 300));
 
   if (data.error) {
     throw new Error(`ODsay 오류: ${data.error.message || data.error.msg || JSON.stringify(data.error)}`);
