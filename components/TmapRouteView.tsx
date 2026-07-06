@@ -65,7 +65,6 @@ async function fetchWalkPathDirect(
       }),
     });
     const data = await res.json();
-    console.log('[도보경로]', key, '→', JSON.stringify(data).slice(0, 300));
     const path: { lat: number; lng: number }[] = [];
     for (const f of (data.features || [])) {
       if (f.geometry?.type === 'LineString') {
@@ -74,6 +73,8 @@ async function fetchWalkPathDirect(
         }
       }
     }
+    const types = (data.features || []).map((f: any) => f.geometry?.type).join(',');
+    console.log('[도보경로]', key, `→ features:${(data.features||[]).length} types:[${types}] points:${path.length}`);
     walkPathCache.set(key, path);
     return path;
   } catch (e) {
