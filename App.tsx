@@ -208,7 +208,7 @@ const App: React.FC = () => {
     || (window.navigator as any).standalone === true;
 
   // Auth State
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(true);
   const [loginProvider, setLoginProvider] = useState<string>('');
   const [showLoginOverlay, setShowLoginOverlay] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
