@@ -610,35 +610,13 @@ const App: React.FC = () => {
     else setShowLoginPrompt(true);
   };
 
-  const openTaxiApp = (app: 'kakao' | 'ut') => {
+  const openTaxiApp = (_app: 'kakao' | 'ut') => {
       track('taxi');
       setShowTaxiSelector(false);
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const isAndroid = /Android/.test(navigator.userAgent);
-
-      const config = {
-          kakao: {
-              scheme: 'kakaot://',
-              intentUrl: 'intent://taxi#Intent;scheme=kakaot;package=com.kakao.taxi;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.kakao.taxi;end',
-              iosStore: 'https://apps.apple.com/kr/app/kakao-t/id981110422',
-              web: 'https://t.kakao.com/',
-          },
-          ut: {
-              scheme: 'ut://',
-              intentUrl: 'intent://main#Intent;scheme=ut;package=com.skt.ut;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.skt.ut;end',
-              iosStore: 'https://apps.apple.com/kr/app/ut/id1550366601',
-              web: 'https://www.ut.cab/',
-          },
-      }[app];
-
-      if (isAndroid) {
-          window.location.href = config.intentUrl;
-      } else if (isIOS) {
-          window.location.href = config.scheme;
-          setTimeout(() => { window.location.href = config.iosStore; }, 1500);
-      } else {
-          window.open(config.web, '_blank');
-      }
+      window.open(
+        'https://docs.google.com/forms/d/e/1FAIpQLSd3IEoCHg0TW-9hc4FV7jzQfmh_UdzbbS8CUPcEDEpy8r2Tug/viewform?usp=header',
+        '_blank',
+      );
   };
 
   const handleGoHome = () => {
