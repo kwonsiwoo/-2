@@ -134,7 +134,10 @@ function selectWalkTaxiIndex(
   strategy: HybridStrategy,
   walkThreshold: number,
   timeMode: TimeMode,
+  departureMs: number,
 ): number | null {
+  const surcharge = 1 + getNightSurchargeRate(departureMs);
+  const taxiCostOf = (walkMin: number) => calcWalkTaxiCost(walkMin) * surcharge;
   const threshold = Math.max(walkThreshold, MIN_WALK_FOR_TAXI);
   const candidates = segments
     .map((s, i) => ({ s, i }))
@@ -156,7 +159,7 @@ function selectWalkTaxiIndex(
     return candidates
       .map(c => ({
         i: c.i,
-        score: (isLast(c.i) ? 3.0 : 1.5) / calcWalkTaxiCost(c.s.durationMinutes) * 10000,
+        score: (isLast(c.i) ? 3.0 : 1.5) / taxiCostOf(c.s.durationMinutes) * 10000,
       }))
       .sort((a, b) => b.score - a.score)[0].i;
   }
@@ -170,7 +173,7 @@ function selectWalkTaxiIndex(
           i: c.i,
           score: calcTimeValueScore(
             calcTimeSavedByTaxi(c.s.durationMinutes),
-            calcWalkTaxiCost(c.s.durationMinutes),
+            taxiCostOf(c.s.durationMinutes),
           ) * posW,
         };
       })
@@ -182,7 +185,7 @@ function selectWalkTaxiIndex(
       i: c.i,
       score: calcTimeValueScore(
         calcTimeSavedByTaxi(c.s.durationMinutes),
-        calcWalkTaxiCost(c.s.durationMinutes),
+        taxiCostOf(c.s.durationMinutes),
       ),
     }))
     .sort((a, b) => b.score - a.score)[0].i;
@@ -208,7 +211,9 @@ function selectTransferPoint(
   endLng: number,
   strategy: HybridStrategy,
   timeMode: TimeMode,
+  departureMs: number,
 ): TransferTaxiPoint | null {
+  const surcharge = 1 + getNightSurchargeRate(departureMs);
   const subPaths: any[] = path.subPath || [];
 
   const candidates: TransferTaxiPoint[] = [];
@@ -224,7 +229,7 @@ function selectTransferPoint(
     const distKm  = haversineKm(lat, lng, endLat, endLng);
     if (distKm < 1.5) return; // 1.5km 미만은 걷는 게 나으므로 택시 제외
 
-    const taxiCost = calcDistanceTaxiCost(distKm);
+    const taxiCost = calcDistanceTaxiCost(distKm) * surcharge;
     const taxiMin  = calcDistanceTaxiMinutes(distKm);
     const remainingTime = subPaths.slice(i + 1).reduce((s: number, sp: any) => s + (sp.sectionTime || 0), 0);
     const timeSaved = remainingTime - taxiMin;
@@ -432,7 +437,7 @@ async function buildTypedRoute(
   const baseSegments = await buildSegments(path, baseMs);
 
   // ── 경로당 택시 1회: 도보 대체 or 환승 지점 택시 ────────────────────────
-  const walkTaxiIdx = selectWalkTaxiIndex(baseSegments, strategy, walkThreshold, timeMode);
+  const walkTaxiIdx = selectWalkTaxiIndex(baseSegments, strategy, walkThreshold, timeMode, baseMs);
 
   let hybridSegments: RouteSegment[];
   let taxiCostTotal  = 0;
@@ -484,7 +489,7 @@ async function buildTypedRoute(
   } else {
     // ── Case B: 도보 대체 후보 없음 → 환승 지점에서 목적지까지 택시 ───────
     isTransferMode = true;
-    const tp = selectTransferPoint(path, endLat, endLng, strategy, timeMode);
+    const tp = selectTransferPoint(path, endLat, endLng, strategy, timeMode, baseMs);
 
     if (tp) {
       // Tmap 실주행 거리로 택시비/시간 보정 (실패 시 직선거리 추정값 유지)
