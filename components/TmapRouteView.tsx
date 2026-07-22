@@ -29,27 +29,35 @@ const segmentColor = (seg: any): string => {
   return '#06D6A0';
 };
 
+const KAKAO_APP_KEY = '57f3c5472b080874b12c0ed191e7670a';
+
 const loadKakaoSDK = (): Promise<void> =>
   new Promise((resolve, reject) => {
     /* eslint-disable @typescript-eslint/no-explicit-any */
     const w = window as any;
     if (w.kakao?.maps?.Map) { resolve(); return; }
-    if (!w.kakao) {
-      console.error('[Kakao] window.kakao 자체가 없음 — Kakao 스크립트 로드 실패 (네트워크 or 도메인 미등록)');
-      reject(new Error('카카오맵 SDK 스크립트가 로드되지 않았습니다.'));
+    if (w.kakao?.maps?.load) { w.kakao.maps.load(resolve); return; }
+
+    const existing = document.querySelector('script[src*="dapi.kakao.com"]');
+    if (existing) {
+      existing.addEventListener('load', () => {
+        if (w.kakao?.maps?.load) w.kakao.maps.load(resolve);
+        else reject(new Error('[Kakao] 스크립트 로드됐으나 maps.load 없음'));
+      });
       return;
     }
-    if (!w.kakao.maps) {
-      console.error('[Kakao] window.kakao는 있지만 .maps 없음 — 도메인이 Kakao 개발자 콘솔에 미등록됐을 가능성');
-      reject(new Error('카카오맵 SDK .maps 초기화 실패 (도메인 미등록?)'));
-      return;
-    }
-    if (!w.kakao.maps.load) {
-      console.error('[Kakao] window.kakao.maps 있지만 .load 없음 — SDK 버전 문제');
-      reject(new Error('카카오맵 SDK .maps.load 없음'));
-      return;
-    }
-    w.kakao.maps.load(resolve);
+
+    const script = document.createElement('script');
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_APP_KEY}&autoload=false`;
+    script.onload = () => {
+      if (w.kakao?.maps?.load) w.kakao.maps.load(resolve);
+      else reject(new Error('[Kakao] 스크립트 로드됐으나 maps.load 없음 — 도메인 미등록 가능성'));
+    };
+    script.onerror = (e) => {
+      console.error('[Kakao] SDK 스크립트 로드 실패 (네트워크 오류):', e);
+      reject(new Error('[Kakao] SDK 네트워크 로드 실패'));
+    };
+    document.head.appendChild(script);
     /* eslint-enable */
   });
 
