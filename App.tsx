@@ -1606,7 +1606,13 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      <p className="text-center text-[11px] text-gray-300 font-medium mt-6 leading-relaxed">
+      <div className="mt-5 bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4">
+        <p className="text-center text-[12px] font-black text-amber-600 mb-1">🔔 베타 버전 안내</p>
+        <p className="text-center text-[11px] text-amber-600 leading-relaxed">
+          현재 테스트 서비스입니다. 로그인은 실제 회원 계정 생성 없이<br/>서비스를 체험하기 위한 임시 로그인입니다.
+        </p>
+      </div>
+      <p className="text-center text-[11px] text-gray-300 font-medium mt-4 leading-relaxed">
         가입 시 이용약관 및 개인정보처리방침에 동의하게 됩니다.
       </p>
     </div>
@@ -2604,6 +2610,11 @@ const App: React.FC = () => {
 
   return (
     <div className="max-w-md mx-auto h-screen bg-white text-gray-800 font-sans overflow-hidden shadow-2xl relative flex flex-col">
+       {/* 베타 서비스 배너 */}
+       <div className="flex items-center justify-center gap-1.5 bg-amber-50 border-b border-amber-100 px-4 py-1.5 shrink-0">
+         <span className="text-[9px] font-black text-amber-500 bg-amber-100 px-1.5 py-0.5 rounded-full uppercase tracking-wider">BETA</span>
+         <span className="text-[11px] text-amber-700 font-medium">경로 탐색은 정상 동작해요 · 로그인 등 일부 기능은 테스트 중이에요</span>
+       </div>
        <div className="flex-1 overflow-hidden relative">
             {renderContent()}
        </div>
