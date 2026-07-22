@@ -38,14 +38,8 @@ const loadKakaoSDK = (): Promise<void> =>
     if (w.kakao?.maps?.Map) { resolve(); return; }
     if (w.kakao?.maps?.load) { w.kakao.maps.load(resolve); return; }
 
-    const existing = document.querySelector('script[src*="dapi.kakao.com"]');
-    if (existing) {
-      existing.addEventListener('load', () => {
-        if (w.kakao?.maps?.load) w.kakao.maps.load(resolve);
-        else reject(new Error('[Kakao] 스크립트 로드됐으나 maps.load 없음'));
-      });
-      return;
-    }
+    // 기존 태그가 있으면(이미 실행됐지만 window.kakao가 없는 상태) 제거 후 재주입
+    document.querySelector('script[src*="dapi.kakao.com"]')?.remove();
 
     const script = document.createElement('script');
     script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_APP_KEY}&autoload=false`;
