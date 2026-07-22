@@ -135,6 +135,9 @@ const App: React.FC = () => {
   const [showSplash, setShowSplash] = useState(true);
   const [splashMessage, setSplashMessage] = useState('');
 
+  // Beta Notice State (세션당 1회)
+  const [showBetaNotice, setShowBetaNotice] = useState(() => !sessionStorage.getItem('betaNoticeDismissed'));
+
   // Navigation State
   const [activeTab, setActiveTab] = useState<Tab>('SEARCH');
   
@@ -1606,13 +1609,7 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      <div className="mt-5 bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4">
-        <p className="text-center text-[12px] font-black text-amber-600 mb-1">🔔 베타 버전 안내</p>
-        <p className="text-center text-[11px] text-amber-600 leading-relaxed">
-          현재 테스트 서비스입니다. 로그인은 실제 회원 계정 생성 없이<br/>서비스를 체험하기 위한 임시 로그인입니다.
-        </p>
-      </div>
-      <p className="text-center text-[11px] text-gray-300 font-medium mt-4 leading-relaxed">
+      <p className="text-center text-[11px] text-gray-300 font-medium mt-6 leading-relaxed">
         가입 시 이용약관 및 개인정보처리방침에 동의하게 됩니다.
       </p>
     </div>
@@ -2610,11 +2607,30 @@ const App: React.FC = () => {
 
   return (
     <div className="max-w-md mx-auto h-screen bg-white text-gray-800 font-sans overflow-hidden shadow-2xl relative flex flex-col">
-       {/* 베타 서비스 배너 */}
-       <div className="flex items-center justify-center gap-1.5 bg-amber-50 border-b border-amber-100 px-4 py-1.5 shrink-0">
-         <span className="text-[9px] font-black text-amber-500 bg-amber-100 px-1.5 py-0.5 rounded-full uppercase tracking-wider">BETA</span>
-         <span className="text-[11px] text-amber-700 font-medium">경로 탐색은 정상 동작해요 · 로그인 등 일부 기능은 테스트 중이에요</span>
-       </div>
+       {/* 베타 안내 팝업 */}
+       {showBetaNotice && !showSplash && (
+         <div className="absolute inset-0 z-[95] bg-black/50 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-200">
+           <div className="bg-white w-full rounded-t-[2rem] p-7 shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
+             <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-6" />
+             <div className="flex justify-center mb-4">
+               <div className="w-14 h-14 rounded-2xl bg-amber-100 flex items-center justify-center text-2xl shadow-sm">
+                 🚧
+               </div>
+             </div>
+             <p className="text-center text-xl font-black text-gray-800 mb-2">베타 서비스 안내</p>
+             <p className="text-center text-sm text-gray-500 font-medium leading-relaxed mb-5">
+               현재 <span className="text-green-500 font-black">경로 탐색은 정상 동작</span>해요!<br/>
+               로그인은 실제 계정이 생성되지 않는<br/>테스트 로그인입니다.
+             </p>
+             <button
+               onClick={() => { setShowBetaNotice(false); sessionStorage.setItem('betaNoticeDismissed', '1'); }}
+               className="w-full bg-brandBlue text-white font-black text-base py-4 rounded-2xl shadow-lg shadow-blue-200 active:scale-[0.98] transition-transform"
+             >
+               확인했어요 👍
+             </button>
+           </div>
+         </div>
+       )}
        <div className="flex-1 overflow-hidden relative">
             {renderContent()}
        </div>
