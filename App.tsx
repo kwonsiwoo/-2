@@ -259,6 +259,17 @@ const App: React.FC = () => {
 
   // Splash Screen Effect + 방문자 트래킹
   useEffect(() => {
+    // Kakao Maps SDK 백그라운드 프리로드 (경로 화면 진입 전 캐시 확보)
+    const w = window as any;
+    if (!w.kakao?.maps?.Map) {
+      const s = document.createElement('script');
+      s.src = 'https://dapi.kakao.com/v2/maps/sdk.js?appkey=57f3c5472b080874b12c0ed191e7670a&autoload=false';
+      s.onload = () => w.kakao?.maps?.load?.(() => {});
+      document.head.appendChild(s);
+    }
+  }, []);
+
+  useEffect(() => {
     setSplashMessage(SPLASH_MESSAGES[Math.floor(Math.random() * SPLASH_MESSAGES.length)]);
     track('visit');
 
