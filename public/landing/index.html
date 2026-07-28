@@ -64,6 +64,7 @@
     color: var(--brand-blue);
     padding-top: 3px;
   }
+  .header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .header-link {
     display: flex; align-items: center; gap: 4px;
     font-size: 12px; color: var(--ink);
@@ -75,6 +76,18 @@
     background: rgba(255,255,255,0.35);
     text-decoration: none;
   }
+  .insta-badge {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 3px 8px rgba(220, 39, 67, 0.3);
+    transition: transform 0.15s ease;
+    text-decoration: none;
+  }
+  .insta-badge:hover { transform: scale(1.08); }
+  .insta-badge svg { width: 20px; height: 20px; }
 
   /* ───────── 히어로 ───────── */
   .hero { text-align: center; padding: 24px 20px 12px; }
@@ -308,6 +321,33 @@
     display: block;
   }
 
+  /* ───────── 카카오 채널 배너 ───────── */
+  .kakao-banner {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #FEE500;
+    border-radius: 24px;
+    padding: 20px;
+    text-decoration: none;
+    box-shadow: 0 8px 24px rgba(254, 229, 0, 0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .kakao-banner:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(254, 229, 0, 0.45); }
+  .kakao-banner:active { transform: scale(0.98); }
+  .kakao-icon {
+    width: 52px; height: 52px;
+    background: rgba(60, 30, 30, 0.1);
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    flex-shrink: 0;
+  }
+  .kakao-text { flex: 1; min-width: 0; }
+  .kakao-text strong { display: block; font-size: 15px; color: #3C1E1E; }
+  .kakao-text span { display: block; font-size: 12px; color: rgba(60, 30, 30, 0.6); margin-top: 2px; }
+  .kakao-arrow { font-size: 18px; color: rgba(60, 30, 30, 0.4); flex-shrink: 0; }
+
   /* ───────── 최종 CTA ───────── */
   .final-cta {
     background: linear-gradient(135deg, var(--brand-blue), var(--brand-purple));
@@ -386,7 +426,16 @@
         </span>
         <span class="logo-text">찐막차</span>
       </div>
-      <a class="header-link" href="/?ref=landing">바로 사용하기 →</a>
+      <div class="header-right">
+        <a class="insta-badge" href="https://www.instagram.com/jjinmakcha/" target="_blank" rel="noopener noreferrer" aria-label="인스타그램">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="2" width="20" height="20" rx="5.5" stroke="white" stroke-width="2" fill="none"/>
+            <circle cx="12" cy="12" r="4.5" stroke="white" stroke-width="2" fill="none"/>
+            <circle cx="17.5" cy="6.5" r="1.2" fill="white"/>
+          </svg>
+        </a>
+        <a class="header-link" href="/?ref=landing">바로 사용하기 →</a>
+      </div>
     </header>
 
     <div class="hero">
@@ -500,6 +549,17 @@
           </div>
         </div>
       </div>
+    </section>
+
+    <section>
+      <a class="kakao-banner" href="http://pf.kakao.com/_EiWxnX" target="_blank" rel="noopener noreferrer">
+        <div class="kakao-icon">💬</div>
+        <div class="kakao-text">
+          <strong>공식 출시 알림 받기 🔔</strong>
+          <span>카카오채널 추가 · 출시 첫날 얼리어답터 혜택</span>
+        </div>
+        <span class="kakao-arrow">›</span>
+      </a>
     </section>
 
     <section>
