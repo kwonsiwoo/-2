@@ -2111,6 +2111,23 @@ const App: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* 카카오 채널 알림 배너 */}
+            <a
+                href="http://pf.kakao.com/_EiWxnX"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-4 bg-[#FEE500] rounded-3xl p-4 shadow-sm active:scale-[0.98] transition-transform no-underline"
+            >
+                <div className="w-11 h-11 bg-[#3C1E1E]/10 rounded-2xl flex items-center justify-center shrink-0 text-xl">
+                    💬
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="font-black text-[#3C1E1E] text-sm">공식 출시 알림 받기 🔔</p>
+                    <p className="text-[#3C1E1E]/60 text-xs font-bold">카카오채널 추가 · 출시 첫날 얼리어답터 혜택</p>
+                </div>
+                <ChevronRight size={18} className="text-[#3C1E1E]/40 shrink-0" />
+            </a>
         </div>
 
         {isNotiModalOpen && (
