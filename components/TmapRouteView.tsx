@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { HybridRoute } from '../types';
 
 const getSubwayColor = (lineName: string): string => {
@@ -97,6 +97,7 @@ const TmapRouteView: React.FC<Props> = ({ route, height = '40vh' }) => {
   const mapInst   = useRef<any>(null);
   const overlays  = useRef<any[]>([]);
   const plines    = useRef<any[]>([]);
+  const [mapError, setMapError] = useState<string | null>(null);
 
   const clearMap = () => {
     overlays.current.forEach(o => o.setMap(null));
@@ -124,6 +125,7 @@ const TmapRouteView: React.FC<Props> = ({ route, height = '40vh' }) => {
     if (allCoords.length === 0) return;
 
     let cancelled = false;
+    setMapError(null);
 
     loadKakaoSDK().then(async () => {
       if (cancelled || !mapRef.current) return;
@@ -135,10 +137,16 @@ const TmapRouteView: React.FC<Props> = ({ route, height = '40vh' }) => {
       if (mapInst.current) { clearMap(); mapInst.current = null; }
 
       const center = allCoords[Math.floor(allCoords.length / 2)];
-      const map = new kakao.maps.Map(mapRef.current, {
-        center: new kakao.maps.LatLng(center.lat, center.lng),
-        level: 5,
-      });
+      let map: any;
+      try {
+        map = new kakao.maps.Map(mapRef.current, {
+          center: new kakao.maps.LatLng(center.lat, center.lng),
+          level: 5,
+        });
+      } catch (e: any) {
+        if (!cancelled) setMapError(e?.message || String(e));
+        return;
+      }
       mapInst.current = map;
 
       // ── walk 좌표 보완: path 없는 도보 구간은 인접 segment 끝점 + 실제 출발/도착 좌표로 직선 ──
@@ -277,7 +285,10 @@ const TmapRouteView: React.FC<Props> = ({ route, height = '40vh' }) => {
       bounds.extend(new kakao.maps.LatLng(destLat, destLng));
       map.setBounds(bounds, 60, 60, 60, 60);
 
-    }).catch(err => console.error('카카오맵 로드 실패:', err));
+    }).catch(err => {
+      console.error('카카오맵 로드 실패:', err);
+      if (!cancelled) setMapError(String(err?.message || err));
+    });
 
     return () => { cancelled = true; clearMap(); };
   }, [route]);
@@ -304,6 +315,12 @@ const TmapRouteView: React.FC<Props> = ({ route, height = '40vh' }) => {
   return (
     <div style={{ position: 'relative', width: '100%', height, overflow: 'hidden' }}>
       <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
+      {mapError && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8f9fa', flexDirection: 'column', gap: 8, padding: 16 }}>
+          <span style={{ fontSize: 24 }}>🗺️</span>
+          <p style={{ fontSize: 12, color: '#6b7280', textAlign: 'center', wordBreak: 'break-all' }}>지도 오류: {mapError}</p>
+        </div>
+      )}
       <button
         onClick={goToMyLocation}
         title="현재 위치로 이동"
