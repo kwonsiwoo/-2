@@ -1887,8 +1887,7 @@ const App: React.FC = () => {
                     <div
                         key={route.id}
                         onClick={() => handleSelectRoute(route)}
-                        className="bg-white rounded-[2rem] overflow-hidden border-l-4 border border-gray-100 cursor-pointer shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all relative"
-                        style={{ borderLeftColor: accent }}
+                        className="bg-white rounded-[2rem] overflow-hidden border border-gray-100 cursor-pointer shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all relative"
                     >
                         <div className="p-5">
                             {/* 카드 헤더: 배지 + 벨 */}
@@ -1980,7 +1979,7 @@ const App: React.FC = () => {
                                     const isBus = seg.type === 'bus';
                                     const isTaxi = seg.type === 'taxi';
                                     const icon = isSubway ? '🚇' : isBus ? '🚌' : isTaxi ? '🚕' : '🚶';
-                                    const showLabel = seg.durationMinutes >= 4;
+                                    const showLabel = seg.durationMinutes > 0;
                                     const isWalk = seg.type === 'walk';
 
                                     const getSubwayColorLocal = (name: string): string => {
@@ -2009,21 +2008,30 @@ const App: React.FC = () => {
                                         return '#6B7280';
                                     };
 
-                                    if (isSubway) console.log('subway lineName:', seg.lineName);
                                     const bgColor = isSubway
                                         ? getSubwayColorLocal(seg.lineName || '')
                                         : isBus ? '#3B82F6' : isTaxi ? '#F97316' : '#D1D5DB';
                                     const textColor = isWalk ? '#6B7280' : '#ffffff';
+                                    // 버스/지하철은 노선번호(예: "150", "1호선")를 바로 보여줘서
+                                    // 바만 봐도 뭘 타야 하는지 알 수 있게 함
+                                    const routeLabel = (isBus || isSubway) ? (seg.lineName || '').replace(/^수도권/, '') : '';
 
                                     return (
                                         <div
                                             key={idx}
-                                            className="flex flex-row items-center justify-start gap-0.5 px-1.5 py-2 min-w-0 overflow-hidden"
-                                            style={{ flex: Math.max(seg.durationMinutes, 3), backgroundColor: bgColor }}
+                                            className="flex flex-col items-center justify-center gap-0.5 px-1 py-2 min-w-0 overflow-hidden"
+                                            style={{ flex: Math.max(Math.sqrt(seg.durationMinutes) * 2, 4), backgroundColor: bgColor }}
                                         >
-                                            <span className="text-xs leading-none shrink-0">{icon}</span>
+                                            <div className="flex items-center gap-0.5 min-w-0 max-w-full">
+                                                <span className="text-xs leading-none shrink-0">{icon}</span>
+                                                {routeLabel && (
+                                                    <span className="text-[10px] font-black leading-none truncate" style={{ color: textColor }}>
+                                                        {routeLabel}
+                                                    </span>
+                                                )}
+                                            </div>
                                             {showLabel && (
-                                                <span className="text-[10px] font-black whitespace-nowrap overflow-hidden" style={{ color: textColor }}>
+                                                <span className="text-[9px] font-bold leading-none whitespace-nowrap overflow-hidden" style={{ color: textColor, opacity: 0.85 }}>
                                                     {seg.durationMinutes}분
                                                 </span>
                                             )}
