@@ -147,39 +147,19 @@ export const reverseGeocode = async (lat: number, lon: number): Promise<string> 
     return '현재위치';
 };
 
-// ─── 좌표 → TAGO 시군구 코드 (카카오 coord2regioncode) ──────────────────
+// ─── 좌표 → TAGO 시군구 코드 (TAGO 좌표기반 근접정류소 조회) ─────────────
+// 서울은 이 API 커버리지가 없어 빈 결과가 정상 → 기본값 '11'(서울)로 처리됨
 const cityCodeCache = new Map<string, string>();
 
 export const getTagoCityCode = async (lat: number, lon: number): Promise<string> => {
     const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
     if (cityCodeCache.has(key)) return cityCodeCache.get(key)!;
 
-    const TAGO_CITY_NAME_TO_CODE: Record<string, string> = {
-        '수원시': '31010', '성남시': '31020', '의정부시': '31030', '안양시': '31040',
-        '부천시': '31050', '광명시': '31060', '평택시': '31070', '동두천시': '31080',
-        '안산시': '31090', '고양시': '31100', '과천시': '31110', '구리시': '31120',
-        '남양주시': '31130', '오산시': '31140', '시흥시': '31150', '군포시': '31160',
-        '의왕시': '31170', '하남시': '31180', '용인시': '31190', '파주시': '31200',
-        '이천시': '31210', '안성시': '31220', '김포시': '31230', '화성시': '31240',
-        '광주시': '31250', '양주시': '31260', '포천시': '31270', '여주시': '31280',
-    };
-
     let code = '11';
     try {
-        const res = await fetch(
-            `${KAKAO_PROXY}?type=coord2regioncode&x=${lon}&y=${lat}`,
-        );
+        const res = await fetch(`/api/tago-city-code?lat=${lat}&lon=${lon}`);
         const data = await res.json();
-        const doc = data.documents?.[0];
-        if (doc) {
-            const region1: string = doc.region_1depth_name || '';
-            const region2: string = doc.region_2depth_name || '';
-            if (region1.includes('인천')) code = '23';
-            else if (!region1.includes('서울')) {
-                const matched = Object.entries(TAGO_CITY_NAME_TO_CODE).find(([name]) => region2.includes(name));
-                if (matched) code = matched[1];
-            }
-        }
+        if (data.cityCode) code = data.cityCode;
     } catch {}
 
     cityCodeCache.set(key, code);
