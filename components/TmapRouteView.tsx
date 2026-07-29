@@ -61,44 +61,6 @@ const loadKakaoSDK = (): Promise<void> => {
   return _sdkPromise;
 };
 
-// 도보 실제 경로 좌표 (Tmap 보행자 API) — 캐시 포함
-const walkPathCache = new Map<string, { lat: number; lng: number }[]>();
-async function fetchWalkPathDirect(
-  startLat: number, startLng: number,
-  endLat: number,   endLng: number,
-): Promise<{ lat: number; lng: number }[]> {
-  const key = `${startLat.toFixed(5)},${startLng.toFixed(5)}->${endLat.toFixed(5)},${endLng.toFixed(5)}`;
-  if (walkPathCache.has(key)) return walkPathCache.get(key)!;
-
-  const appKey = ((import.meta as any).env?.VITE_TMAP_APP_KEY || '').trim();
-  if (!appKey) return [];
-  try {
-    const res = await fetch('https://apis.openapi.sk.com/tmap/routes/pedestrian?version=1', {
-      method: 'POST',
-      headers: { appKey, 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        startX: String(startLng), startY: String(startLat),
-        endX: String(endLng),   endY: String(endLat),
-        startName: '출발', endName: '도착',
-        reqCoordType: 'WGS84GEO', resCoordType: 'WGS84GEO', searchOption: '0',
-      }),
-    });
-    const data = await res.json();
-    const path: { lat: number; lng: number }[] = [];
-    for (const f of (data.features || [])) {
-      if (f.geometry?.type === 'LineString') {
-        for (const coord of (f.geometry.coordinates as number[][])) {
-          path.push({ lat: Number(coord[1]), lng: Number(coord[0]) });
-        }
-      }
-    }
-    walkPathCache.set(key, path);
-    return path;
-  } catch (e) {
-    console.error('[도보경로 오류]', e);
-    return [];
-  }
-}
 
 interface Props {
   route: HybridRoute;
@@ -179,15 +141,6 @@ const TmapRouteView: React.FC<Props> = ({ route, height = '40vh' }) => {
         return seg;
       });
 
-      // ── walk 직선(2점) → Tmap 실제 보행 경로로 교체 ──────────────────────
-      if (!cancelled) {
-        await Promise.all(enriched.map(async (seg, i) => {
-          if (seg.type !== 'walk' || (seg.path?.length ?? 0) !== 2) return;
-          const [s, e] = seg.path;
-          const actual = await fetchWalkPathDirect(s.lat, s.lng, e.lat, e.lng);
-          if (actual.length >= 2) enriched[i] = { ...seg, path: actual };
-        }));
-      }
       if (cancelled || !mapRef.current) return;
 
       // ── 1차: 대중교통·택시 폴리라인 (walk보다 먼저 그려 아래에 위치) ──────
