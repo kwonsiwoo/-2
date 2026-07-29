@@ -1757,7 +1757,7 @@ const App: React.FC = () => {
 
         <div
             ref={resultsScrollRef}
-            className="flex-1 overflow-y-auto p-4 space-y-4"
+            className="flex-1 overflow-y-auto pt-0 pb-4 px-4 space-y-4"
             onTouchStart={(e) => {
                 if ((resultsScrollRef.current?.scrollTop ?? 1) === 0) {
                     pullStartYRef.current = e.touches[0].clientY;
