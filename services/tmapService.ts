@@ -1,9 +1,6 @@
 import { HybridRoute, RouteSegment } from '../types';
 
-const getKakaoKey = (): string =>
-    (import.meta.env.VITE_KAKAO_REST_API_KEY || '58f54e0b7f6cc940c70ad17a998ea420').trim();
-
-const kakaoHeaders = () => ({ Authorization: `KakaoAK ${getKakaoKey()}` });
+const KAKAO_PROXY = '/api/kakao-local';
 
 // ─── Haversine 직선거리 (m) ────────────────────────────────────────────────
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -38,8 +35,7 @@ const extractSearchKeyword = (input: string): string[] => {
 const kakaoAddressSearch = async (query: string): Promise<{ lat: number; lon: number } | null> => {
     try {
         const res = await fetch(
-            `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(query)}&size=1`,
-            { headers: kakaoHeaders() },
+            `${KAKAO_PROXY}?type=address&query=${encodeURIComponent(query)}&size=1`,
         );
         const data = await res.json();
         const doc = data.documents?.[0];
@@ -52,8 +48,7 @@ const kakaoAddressSearch = async (query: string): Promise<{ lat: number; lon: nu
 const kakaoKeywordSearch = async (query: string, size = 1): Promise<{ lat: number; lon: number } | null> => {
     try {
         const res = await fetch(
-            `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(query)}&size=${size}`,
-            { headers: kakaoHeaders() },
+            `${KAKAO_PROXY}?type=keyword&query=${encodeURIComponent(query)}&size=${size}`,
         );
         const data = await res.json();
         const doc = data.documents?.[0];
@@ -92,8 +87,7 @@ export interface PoiSuggestion {
 export const searchPoiSuggestions = async (query: string): Promise<PoiSuggestion[]> => {
     try {
         const res = await fetch(
-            `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(query)}&size=8`,
-            { headers: kakaoHeaders() },
+            `${KAKAO_PROXY}?type=keyword&query=${encodeURIComponent(query)}&size=8`,
         );
         const data = await res.json();
         return (data.documents || []).map((doc: any) => ({
@@ -112,8 +106,7 @@ export const searchPoiSuggestions = async (query: string): Promise<PoiSuggestion
 export const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
     try {
         const res = await fetch(
-            `https://dapi.kakao.com/v2/local/geo/coord2address.json?x=${lon}&y=${lat}`,
-            { headers: kakaoHeaders() },
+            `${KAKAO_PROXY}?type=coord2address&x=${lon}&y=${lat}`,
         );
         const data = await res.json();
         const doc = data.documents?.[0];
@@ -157,8 +150,7 @@ export const getTagoCityCode = async (lat: number, lon: number): Promise<string>
     let code = '11';
     try {
         const res = await fetch(
-            `https://dapi.kakao.com/v2/local/geo/coord2regioncode.json?x=${lon}&y=${lat}`,
-            { headers: kakaoHeaders() },
+            `${KAKAO_PROXY}?type=coord2regioncode&x=${lon}&y=${lat}`,
         );
         const data = await res.json();
         const doc = data.documents?.[0];

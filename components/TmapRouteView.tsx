@@ -29,8 +29,6 @@ const segmentColor = (seg: any): string => {
   return '#06D6A0';
 };
 
-const KAKAO_APP_KEY = '57f3c5472b080874b12c0ed191e7670a';
-
 let _sdkPromise: Promise<void> | null = null;
 
 const loadKakaoSDK = (): Promise<void> => {
