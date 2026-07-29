@@ -1,6 +1,7 @@
 import { HybridRoute, RouteSegment } from '../types';
 
 const KAKAO_PROXY = '/api/kakao-local';
+const NAVER_PROXY = '/api/naver-local';
 
 // ─── Haversine 직선거리 (m) ────────────────────────────────────────────────
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -57,6 +58,18 @@ const kakaoKeywordSearch = async (query: string, size = 1): Promise<{ lat: numbe
     return null;
 };
 
+// ─── 네이버 지역 검색 (무료) ──────────────────────────────────────────────
+const naverLocalSearch = async (query: string, display = 1): Promise<{ name: string; address: string; lat: number; lon: number }[]> => {
+    try {
+        const res = await fetch(
+            `${NAVER_PROXY}?query=${encodeURIComponent(query)}&display=${display}`,
+        );
+        const data = await res.json();
+        return data.items || [];
+    } catch {}
+    return [];
+};
+
 const osmSearch = async (query: string): Promise<{ lat: number; lon: number } | null> => {
     try {
         const res = await fetch(
@@ -85,6 +98,10 @@ export interface PoiSuggestion {
 }
 
 export const searchPoiSuggestions = async (query: string): Promise<PoiSuggestion[]> => {
+    const naverItems = await naverLocalSearch(query, 8);
+    if (naverItems.length > 0) return naverItems;
+
+    // 네이버 결과 없을 때만 카카오로 폴백
     try {
         const res = await fetch(
             `${KAKAO_PROXY}?type=keyword&query=${encodeURIComponent(query)}&size=8`,
@@ -176,11 +193,14 @@ export const getCoordinates = async (keyword: string): Promise<{ lat: number; lo
     const candidates = extractSearchKeyword(keyword);
 
     for (const query of candidates) {
-        const addrResult = await kakaoAddressSearch(query);
-        if (addrResult) { console.log(`카카오 주소검색 성공: "${query}"`, addrResult); return addrResult; }
+        const [naverItem] = await naverLocalSearch(query, 1);
+        if (naverItem) { console.log(`네이버 검색 성공: "${query}"`, naverItem); return { lat: naverItem.lat, lon: naverItem.lon }; }
 
         const osmResult = await osmSearch(query);
         if (osmResult) { console.log(`OSM 성공: "${query}"`, osmResult); return osmResult; }
+
+        const addrResult = await kakaoAddressSearch(query);
+        if (addrResult) { console.log(`카카오 주소검색 성공: "${query}"`, addrResult); return addrResult; }
 
         const poiResult = await kakaoKeywordSearch(query);
         if (poiResult) { console.log(`카카오 키워드검색 성공: "${query}"`, poiResult); return poiResult; }
