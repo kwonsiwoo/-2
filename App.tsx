@@ -1801,16 +1801,11 @@ const App: React.FC = () => {
                 href="http://pf.kakao.com/_EiWxnX"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-4 bg-[#FEE500] rounded-3xl p-4 shadow-sm active:scale-[0.98] transition-transform no-underline"
+                className="flex items-center gap-2.5 bg-[#FEE500] rounded-2xl px-4 py-2.5 active:scale-[0.98] transition-transform no-underline"
             >
-                <div className="w-11 h-11 bg-[#3C1E1E]/10 rounded-2xl flex items-center justify-center shrink-0 text-xl">
-                    💬
-                </div>
-                <div className="flex-1 min-w-0">
-                    <p className="font-black text-[#3C1E1E] text-sm">공식 출시 알림 받기 🔔</p>
-                    <p className="text-[#3C1E1E]/60 text-xs font-bold">카카오채널 추가</p>
-                </div>
-                <ChevronRight size={18} className="text-[#3C1E1E]/40 shrink-0" />
+                <span className="text-base shrink-0">💬</span>
+                <p className="flex-1 font-black text-[#3C1E1E] text-sm">공식 출시 알림 받기 🔔</p>
+                <ChevronRight size={15} className="text-[#3C1E1E]/40 shrink-0" />
             </a>
 
             {/* 오늘의 찐막차 배너 — 히든 처리 */}
