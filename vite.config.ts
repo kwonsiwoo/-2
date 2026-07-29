@@ -10,9 +10,15 @@ export default defineConfig(({ mode }) => {
     const SEOUL_BUS_KEY = env.SEOUL_BUS_API_KEY || '';
     const ODSAY_KEY = env.ODSAY_API_KEY || '';
     const ODSAY_REFERER = env.ODSAY_REFERER || 'http://localhost:3000';
+    const KAKAO_REST_KEY = env.KAKAO_REST_API_KEY || '';
+    const NAVER_CLIENT_ID = env.NAVER_CLIENT_ID || '';
+    const NAVER_CLIENT_SECRET = env.NAVER_CLIENT_SECRET || '';
     const TAGO_BASE = 'https://apis.data.go.kr/1613000';
     const SEOUL_BUS_BASE = 'http://ws.bus.go.kr/api/rest';
     const ODSAY_BASE = 'https://api.odsay.com/v1/api';
+    const KAKAO_LOCAL_BASE = 'https://dapi.kakao.com/v2/local';
+    const NAVER_LOCAL_BASE = 'https://openapi.naver.com/v1/search/local.json';
+    const stripTags = (s: string): string => s.replace(/<[^>]*>/g, '');
 
     const toItems = (data: any): any[] => {
         const item = data?.response?.body?.items?.item;
@@ -295,6 +301,120 @@ export default defineConfig(({ mode }) => {
                             } catch (e: any) {
                                 res.setHeader('Content-Type', 'application/json');
                                 res.end(JSON.stringify({ error: e.message, arrivals: [] }));
+                            }
+                            return;
+                        }
+
+                        // 카카오 로컬 API 프록시
+                        if (url.startsWith('/api/kakao-local')) {
+                            const params = new URLSearchParams(url.split('?')[1] || '');
+                            const type = params.get('type') || '';
+                            const KAKAO_ENDPOINTS: Record<string, string> = {
+                                address: '/search/address.json',
+                                keyword: '/search/keyword.json',
+                                coord2address: '/geo/coord2address.json',
+                                coord2regioncode: '/geo/coord2regioncode.json',
+                            };
+                            if (!KAKAO_REST_KEY) {
+                                res.statusCode = 500;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ error: 'KAKAO_REST_API_KEY 환경변수가 설정되지 않았습니다' }));
+                                return;
+                            }
+                            const kakaoPath = KAKAO_ENDPOINTS[type];
+                            if (!kakaoPath) {
+                                res.statusCode = 400;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ error: `알 수 없는 type: ${type}` }));
+                                return;
+                            }
+                            params.delete('type');
+                            try {
+                                const r = await fetch(`${KAKAO_LOCAL_BASE}${kakaoPath}?${params.toString()}`, {
+                                    headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` },
+                                });
+                                const data = await r.json();
+                                res.statusCode = r.status;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify(data));
+                            } catch (e: any) {
+                                res.statusCode = 500;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ error: e.message }));
+                            }
+                            return;
+                        }
+
+                        // 네이버 지역 검색 프록시
+                        if (url.startsWith('/api/naver-local')) {
+                            const params = new URLSearchParams(url.split('?')[1] || '');
+                            const query = params.get('query') || '';
+                            const display = params.get('display') || '8';
+                            if (!query) {
+                                res.statusCode = 400;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ error: 'query 필요' }));
+                                return;
+                            }
+                            if (!NAVER_CLIENT_ID || !NAVER_CLIENT_SECRET) {
+                                res.statusCode = 500;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ error: 'NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 환경변수가 설정되지 않았습니다' }));
+                                return;
+                            }
+                            try {
+                                const r = await fetch(
+                                    `${NAVER_LOCAL_BASE}?query=${encodeURIComponent(query)}&display=${display}&sort=random`,
+                                    {
+                                        headers: {
+                                            'X-Naver-Client-Id': NAVER_CLIENT_ID,
+                                            'X-Naver-Client-Secret': NAVER_CLIENT_SECRET,
+                                        },
+                                    },
+                                );
+                                const data = await r.json();
+                                const items = (data.items || []).map((item: any) => ({
+                                    name: stripTags(item.title || ''),
+                                    category: item.category || '',
+                                    address: item.roadAddress || item.address || '',
+                                    lat: Number(item.mapy) / 1e7,
+                                    lon: Number(item.mapx) / 1e7,
+                                })).filter((p: any) => p.lat && p.lon);
+                                res.statusCode = r.status;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ items }));
+                            } catch (e: any) {
+                                res.statusCode = 500;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ error: e.message }));
+                            }
+                            return;
+                        }
+
+                        // 좌표 → TAGO 시군구 코드
+                        if (url.startsWith('/api/tago-city-code')) {
+                            const params = new URLSearchParams(url.split('?')[1] || '');
+                            const lat = params.get('lat') || '';
+                            const lon = params.get('lon') || '';
+                            if (!lat || !lon) {
+                                res.statusCode = 400;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ error: 'lat, lon 필요' }));
+                                return;
+                            }
+                            try {
+                                const r = await fetch(
+                                    `${TAGO_BASE}/BusSttnInfoInqireService/getCrdntPrxmtSttnList?serviceKey=${TAGO_KEY}&gpsLati=${lat}&gpsLong=${lon}&_type=json&numOfRows=1`
+                                );
+                                const data = await r.json();
+                                const item = data?.response?.body?.items?.item;
+                                const first = Array.isArray(item) ? item[0] : item;
+                                const cityCode = first?.citycode ? String(first.citycode) : '11';
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ cityCode }));
+                            } catch (e: any) {
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ cityCode: '11', error: e.message }));
                             }
                             return;
                         }

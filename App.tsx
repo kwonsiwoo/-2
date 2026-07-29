@@ -2039,6 +2039,12 @@ const App: React.FC = () => {
                                 routeIndex={index}
                             />
                         </div>
+
+                        {/* 클릭 유도 힌트 */}
+                        <div className="flex items-center justify-center gap-1 py-2.5 border-t border-gray-50 text-gray-400">
+                            <span className="text-xs font-bold">상세 경로 보기</span>
+                            <ChevronRight size={14} />
+                        </div>
                     </div>
                 );
             })}
