@@ -259,8 +259,6 @@ const App: React.FC = () => {
 
   // Splash Screen Effect + 방문자 트래킹
   useEffect(() => {
-
-  useEffect(() => {
     setSplashMessage(SPLASH_MESSAGES[Math.floor(Math.random() * SPLASH_MESSAGES.length)]);
     track('visit');
 
