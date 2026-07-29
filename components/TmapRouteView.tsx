@@ -31,14 +31,17 @@ const segmentColor = (seg: any): string => {
 
 const KAKAO_APP_KEY = '57f3c5472b080874b12c0ed191e7670a';
 
-const loadKakaoSDK = (): Promise<void> =>
-  new Promise((resolve, reject) => {
-    /* eslint-disable @typescript-eslint/no-explicit-any */
-    const w = window as any;
-    if (w.kakao?.maps?.Map) { resolve(); return; }
+let _sdkPromise: Promise<void> | null = null;
+
+const loadKakaoSDK = (): Promise<void> => {
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const w = window as any;
+  if (w.kakao?.maps?.Map) return Promise.resolve();
+  if (_sdkPromise) return _sdkPromise;
+
+  _sdkPromise = new Promise((resolve, reject) => {
     if (w.kakao?.maps?.load) { w.kakao.maps.load(resolve); return; }
 
-    // 기존 태그가 있으면(이미 실행됐지만 window.kakao가 없는 상태) 제거 후 재주입
     document.querySelector('script[src*="dapi.kakao.com"]')?.remove();
 
     const script = document.createElement('script');
@@ -48,12 +51,15 @@ const loadKakaoSDK = (): Promise<void> =>
       else reject(new Error('[Kakao] 스크립트 로드됐으나 maps.load 없음 — 도메인 미등록 가능성'));
     };
     script.onerror = (e) => {
+      _sdkPromise = null;
       console.error('[Kakao] SDK 스크립트 로드 실패 (네트워크 오류):', e);
       reject(new Error('[Kakao] SDK 네트워크 로드 실패'));
     };
     document.head.appendChild(script);
-    /* eslint-enable */
   });
+  /* eslint-enable */
+  return _sdkPromise;
+};
 
 // 도보 실제 경로 좌표 (Tmap 보행자 API) — 캐시 포함
 const walkPathCache = new Map<string, { lat: number; lng: number }[]>();
