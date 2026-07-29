@@ -39,23 +39,24 @@ const loadKakaoSDK = (): Promise<void> => {
   if (w.kakao?.maps?.Map) return Promise.resolve();
   if (_sdkPromise) return _sdkPromise;
 
-  _sdkPromise = new Promise((resolve, reject) => {
-    if (w.kakao?.maps?.load) { w.kakao.maps.load(resolve); return; }
-
-    document.querySelector('script[src*="dapi.kakao.com"]')?.remove();
-
-    const script = document.createElement('script');
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_APP_KEY}&autoload=false`;
-    script.onload = () => {
-      if (w.kakao?.maps?.load) w.kakao.maps.load(resolve);
-      else reject(new Error('[Kakao] 스크립트 로드됐으나 maps.load 없음 — 도메인 미등록 가능성'));
-    };
-    script.onerror = (e) => {
-      _sdkPromise = null;
-      console.error('[Kakao] SDK 스크립트 로드 실패 (네트워크 오류):', e);
-      reject(new Error('[Kakao] SDK 네트워크 로드 실패'));
-    };
-    document.head.appendChild(script);
+  _sdkPromise = new Promise<void>((resolve, reject) => {
+    if (w.kakao?.maps?.load) {
+      w.kakao.maps.load(resolve);
+    } else {
+      // index.html에서 SDK가 아직 로드 중 — 100ms 간격으로 최대 10초 대기
+      let attempts = 0;
+      const timer = setInterval(() => {
+        attempts++;
+        if (w.kakao?.maps?.load) {
+          clearInterval(timer);
+          w.kakao.maps.load(resolve);
+        } else if (attempts > 100) {
+          clearInterval(timer);
+          _sdkPromise = null;
+          reject(new Error('카카오맵 SDK 로드 타임아웃'));
+        }
+      }, 100);
+    }
   });
   /* eslint-enable */
   return _sdkPromise;
