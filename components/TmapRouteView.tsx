@@ -62,6 +62,31 @@ const loadKakaoSDK = (): Promise<void> => {
 };
 
 
+// ─── OSRM 도보 경로 (무료, API 키 불필요) ────────────────────────────────
+const walkPathCache = new Map<string, { lat: number; lng: number }[]>();
+
+async function fetchWalkPath(
+  startLat: number, startLng: number,
+  endLat: number,   endLng: number,
+): Promise<{ lat: number; lng: number }[]> {
+  const key = `${startLat.toFixed(5)},${startLng.toFixed(5)}->${endLat.toFixed(5)},${endLng.toFixed(5)}`;
+  if (walkPathCache.has(key)) return walkPathCache.get(key)!;
+  try {
+    const url = `https://router.project-osrm.org/route/v1/foot/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const coords: number[][] = data.routes?.[0]?.geometry?.coordinates;
+    if (coords?.length >= 2) {
+      const path = coords.map(([lng, lat]) => ({ lat, lng }));
+      walkPathCache.set(key, path);
+      return path;
+    }
+  } catch (e) {
+    console.error('[도보경로 오류]', e);
+  }
+  return [];
+}
+
 interface Props {
   route: HybridRoute;
   height?: string;
@@ -141,6 +166,15 @@ const TmapRouteView: React.FC<Props> = ({ route, height = '40vh' }) => {
         return seg;
       });
 
+      // ── walk 직선(2점) → OSRM 실제 보행 경로로 교체 ────────────────────
+      if (!cancelled) {
+        await Promise.all(enriched.map(async (seg, i) => {
+          if (seg.type !== 'walk' || (seg.path?.length ?? 0) !== 2) return;
+          const [s, e] = seg.path;
+          const actual = await fetchWalkPath(s.lat, s.lng, e.lat, e.lng);
+          if (actual.length >= 2) enriched[i] = { ...seg, path: actual };
+        }));
+      }
       if (cancelled || !mapRef.current) return;
 
       // ── 1차: 대중교통·택시 폴리라인 (walk보다 먼저 그려 아래에 위치) ──────
