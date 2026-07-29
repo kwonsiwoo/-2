@@ -119,19 +119,8 @@ export const searchPoiSuggestions = async (query: string): Promise<PoiSuggestion
     }
 };
 
-// ─── 좌표 → 주소 (카카오 역지오코딩) ────────────────────────────────────
+// ─── 좌표 → 주소 (OSM 역지오코딩 우선, 실패 시 카카오 폴백) ──────────────
 export const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
-    try {
-        const res = await fetch(
-            `${KAKAO_PROXY}?type=coord2address&x=${lon}&y=${lat}`,
-        );
-        const data = await res.json();
-        const doc = data.documents?.[0];
-        if (doc) {
-            return doc.road_address?.address_name || doc.address?.address_name || '현재위치';
-        }
-    } catch {}
-    // 폴백: OSM Nominatim
     try {
         const res = await fetch(
             `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=ko`,
@@ -142,6 +131,17 @@ export const reverseGeocode = async (lat: number, lon: number): Promise<string> 
         if (addr) {
             const parts = [addr.road, addr.quarter || addr.suburb, addr.city_district || addr.borough].filter(Boolean);
             if (parts.length) return parts.join(' ');
+        }
+    } catch {}
+    // 폴백: 카카오 역지오코딩
+    try {
+        const res = await fetch(
+            `${KAKAO_PROXY}?type=coord2address&x=${lon}&y=${lat}`,
+        );
+        const data = await res.json();
+        const doc = data.documents?.[0];
+        if (doc) {
+            return doc.road_address?.address_name || doc.address?.address_name || '현재위치';
         }
     } catch {}
     return '현재위치';
