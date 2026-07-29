@@ -180,19 +180,3 @@ export const getSubwayArrivals = async (stationName: string, direction?: string,
     return [];
   }
 };
-
-// 버스 실시간 도착 (정류소 이름)
-export const getBusArrivals = async (stationName: string, routeName?: string): Promise<BusArrival[]> => {
-  try {
-    const clean = stationName.replace(/정류장$/, '').replace(/정류소$/, '').trim();
-    const url = `/api/bus?stationName=${encodeURIComponent(clean)}&routeName=${encodeURIComponent(routeName || '')}`;
-
-    const res = await fetch(url);
-    const data = await res.json();
-
-    return (data.arrivals || []).slice(0, 4);
-  } catch (e) {
-    console.error('버스 실시간 도착 오류:', e);
-    return [];
-  }
-};
