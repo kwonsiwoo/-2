@@ -1799,7 +1799,7 @@ const App: React.FC = () => {
                 href="http://pf.kakao.com/_EiWxnX"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2.5 bg-[#FEE500] rounded-2xl px-4 py-2.5 active:scale-[0.98] transition-transform no-underline"
+                className="flex items-center gap-2.5 bg-[#FEE500] rounded-2xl px-4 py-1.5 active:scale-[0.98] transition-transform no-underline"
             >
                 <span className="text-base shrink-0">💬</span>
                 <p className="flex-1 font-black text-[#3C1E1E] text-sm">공식 출시 알림 받기 🔔</p>
