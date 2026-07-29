@@ -4,6 +4,13 @@ const BASE = 'http://ws.bus.go.kr/api/rest';
 const KEY = process.env.SEOUL_BUS_API_KEY || '';
 const ROUTE_KEY = process.env.SEOUL_BUS_ROUTE_API_KEY || KEY;
 
+// arrmsg1/2는 "2분31초후[1번째 전]" 형태 — 대괄호 안 숫자가 실제 남은 정류장 수.
+// traTime1/2는 도착까지 남은 '초' 단위 시간이라 정류장 수가 아님.
+const extractStopCount = (msg: string): number => {
+  const m = (msg || '').match(/\[(\d+)번째\s*전\]/);
+  return m ? Number(m[1]) : 0;
+};
+
 const toItems = (data: any): any[] => {
   const items = data?.msgBody?.itemList ?? data?.ServiceResult?.msgBody?.itemList;
   if (!items) return [];
@@ -79,7 +86,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 routeNo: item.rtNm || routeNo,
                 arrMsg: item.arrmsg1 || '',
                 arrMsg2: item.arrmsg2 || '',
-                remainStop: parseInt(item.traTime1 ?? '0') || 0,
+                remainStop: extractStopCount(item.arrmsg1),
                 arrtime: 0,
                 routeType: item.routeType || '',
               }));
@@ -111,7 +118,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         routeNo: item.rtNm || '',
         arrMsg: item.arrmsg1 || '',
         arrMsg2: item.arrmsg2 || '',
-        remainStop: parseInt(item.traTime1 ?? '0') || 0,
+        remainStop: extractStopCount(item.arrmsg1),
         arrtime: 0,
       }));
       if (routeNo) cands = cands.filter((a: any) => a.routeNo.includes(routeNo));
