@@ -9,6 +9,17 @@ const toItems = (data: any): any[] => {
   return Array.isArray(item) ? item : [item];
 };
 
+// data.go.kr는 트래픽 초과·일시 장애 시에도 200과 함께 XML을 내려줄 때가 있어
+// res.json()이 그대로 예외를 던진다. 텍스트로 받아 안전하게 파싱한다.
+const safeJson = (text: string, label: string): any => {
+  try {
+    return JSON.parse(text);
+  } catch {
+    console.warn(`[tago-arrival] ${label} JSON 파싱 실패:`, text.slice(0, 200));
+    return null;
+  }
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
@@ -19,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const stationRes = await fetch(
       `${BASE}/BusSttnInfoInqireService/getSttnNoList?serviceKey=${KEY}&cityCode=${cityCode}&nodeNm=${encodeURIComponent(String(nodeNm || ''))}&_type=json&numOfRows=5`
     );
-    const stationData = await stationRes.json();
+    const stationData = safeJson(await stationRes.text(), '정류소검색');
     const stations = toItems(stationData);
 
     if (stations.length === 0) {
@@ -33,7 +44,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const arrivalRes = await fetch(
       `${BASE}/ArvlInfoInqireService/getSttnAcctoArvlPrearngeInfoList?serviceKey=${KEY}&cityCode=${cityCode}&nodeId=${nodeId}&_type=json&numOfRows=10`
     );
-    const arrivalData = await arrivalRes.json();
+    const arrivalData = safeJson(await arrivalRes.text(), '도착정보');
+    if (!arrivalData) {
+      return res.json({ arrivals: [], stationName, nodeId });
+    }
     const arrivals = toItems(arrivalData).map((item: any) => ({
       routeNo: item.routeno || '',
       routeId: item.routeid || '',
