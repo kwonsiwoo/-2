@@ -1,7 +1,7 @@
 import { HybridRoute, RouteSegment } from '../types';
 
 const getKakaoKey = (): string =>
-    (import.meta.env.VITE_KAKAO_REST_API_KEY || '').trim();
+    (import.meta.env.VITE_KAKAO_REST_API_KEY || '58f54e0b7f6cc940c70ad17a998ea420').trim();
 
 const kakaoHeaders = () => ({ Authorization: `KakaoAK ${getKakaoKey()}` });
 
