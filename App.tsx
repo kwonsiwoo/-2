@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { MapPin, Navigation, Bus, Train, ArrowRight, ChevronLeft, Search, Beer, Car, Clock, Sparkles, User, CreditCard, Home, Settings, Edit2, Bell, ToggleLeft, ToggleRight, Store, Star, X, Utensils, BellRing, Shield, TrendingUp, Phone, Footprints, ChevronRight, FileText, Plus, Coffee, Wine, Mail, Camera } from 'lucide-react';
 import { getOdsayTransitRoutes } from './services/odsayService';
-import { reverseGeocode, setCachedCoordinates } from './services/tmapService';
+import { reverseGeocode, setCachedCoordinates, getCoordinates, searchOpenPlaces, OpenPlace, OpenPlaceCategory } from './services/tmapService';
 import { findLatestDeparture } from './services/latestDepartureService';
 import { AppState, HybridRoute, LDTResult, Place } from './types';
 import CostChart from './components/CostChart';
@@ -350,7 +350,8 @@ const App: React.FC = () => {
           track('search');
           setRoutes(fetchedRoutes);
           setFullTaxiCost(fetchedCost);
-          setNearbyPlaces(MOCK_PLACES);
+          setNearbyPlaces([]);
+          fetchRealOpenPlaces(); // 백그라운드에서 "아쉬우면 한잔 더?" 채우기
           setAppState(AppState.RESULTS);
 
           // LDT 계산 — 백그라운드 비동기
@@ -459,14 +460,56 @@ const App: React.FC = () => {
     return true;
   });
 
+  // 네이버 검색 결과(OpenPlace)엔 평점/마감시간/대표메뉴가 없어서, 있는 척
+  // 꾸미지 않고 실제로 아는 정보(이름·카테고리·주소·거리)만 채워넣음
+  const mapOpenPlaceToPlace = (op: OpenPlace): Place => {
+      const catParts = op.category.split('>').map(s => s.trim()).filter(Boolean);
+      const shortType = catParts[catParts.length - 1] || '가게';
+      const distanceLabel = op.distanceM < 1000 ? `${Math.round(op.distanceM)}m` : `${(op.distanceM / 1000).toFixed(1)}km`;
+      return {
+          id: op.id,
+          name: op.name,
+          type: shortType,
+          rating: '',
+          address: op.address,
+          description: catParts.join(' · '),
+          closingTime: '',
+          tags: catParts.slice(0, 2),
+          imageKeyword: shortType,
+          representativeMenu: '',
+          distance: distanceLabel,
+      };
+  };
+
+  // "페이홍러우 을지로점" 같은 구체적 상호명은 "{상호명} 포차"로 검색하면
+  // 네이버에서 결과가 안 나옴 — 좌표를 동네 이름으로 역지오코딩해서 그걸 앵커로 씀
+  const extractAreaAnchor = (address: string): string => {
+      const tokens = address.split(/\s+/).filter(t => t && !/^\d/.test(t));
+      return tokens.slice(-2).join(' ');
+  };
+
+  const fetchRealOpenPlaces = async (categories?: OpenPlaceCategory[]) => {
+      const anchor = startLoc.trim();
+      if (!anchor) { setNearbyPlaces([]); return; }
+      try {
+          const coords = await getCoordinates(anchor);
+          if (!coords) { setNearbyPlaces([]); return; }
+          const areaAddress = await reverseGeocode(coords.lat, coords.lon);
+          const areaAnchor = extractAreaAnchor(areaAddress) || anchor;
+          const results = await searchOpenPlaces(areaAnchor, coords.lat, coords.lon, categories);
+          setNearbyPlaces(results.map(mapOpenPlaceToPlace));
+      } catch (e) {
+          console.error('영업중 장소 검색 오류:', e);
+          setNearbyPlaces([]);
+      }
+  };
+
   const handleFetchPlacesTab = async () => {
       // Called when clicking "Open Now" tab manually if empty
       if (nearbyPlaces.length > 0) return;
-      
+
       setIsPlacesLoading(true);
-      // Simulate network delay for effect
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setNearbyPlaces(MOCK_PLACES);
+      await fetchRealOpenPlaces();
       setIsPlacesLoading(false);
   };
 
@@ -924,23 +967,27 @@ const App: React.FC = () => {
                             </div>
 
                             <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-gray-800 px-3 py-1 rounded-full text-xs font-black shadow-lg">
-                                {place.closingTime} 마감
+                                {place.closingTime ? `${place.closingTime} 마감` : '🌙 심야영업'}
                             </div>
 
                             <div className="absolute bottom-4 left-4 text-white right-4">
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className="bg-brandPink text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">{place.type}</span>
-                                    <span className="flex items-center text-yellow-400 text-xs font-bold gap-0.5 drop-shadow-md"><Star size={10} fill="currentColor"/> {place.rating}</span>
+                                    {place.rating && (
+                                        <span className="flex items-center text-yellow-400 text-xs font-bold gap-0.5 drop-shadow-md"><Star size={10} fill="currentColor"/> {place.rating}</span>
+                                    )}
                                 </div>
                                 <h3 className="text-xl font-black shadow-black drop-shadow-md truncate">{place.name}</h3>
                             </div>
                             </div>
-                            
+
                             <div className="p-5">
-                            <div className="flex items-center gap-2 mb-3 bg-gray-50 p-2 rounded-xl">
-                                <Utensils size={14} className="text-gray-400" />
-                                <p className="text-gray-600 text-xs font-bold truncate">대표: <span className="text-gray-800">{place.representativeMenu}</span></p>
-                            </div>
+                            {place.representativeMenu && (
+                                <div className="flex items-center gap-2 mb-3 bg-gray-50 p-2 rounded-xl">
+                                    <Utensils size={14} className="text-gray-400" />
+                                    <p className="text-gray-600 text-xs font-bold truncate">대표: <span className="text-gray-800">{place.representativeMenu}</span></p>
+                                </div>
+                            )}
                             <p className="text-gray-500 text-sm mb-3 line-clamp-2 font-medium leading-relaxed">{place.description}</p>
                             <div className="flex flex-wrap gap-2">
                                 {place.tags.map((tag, i) => (
@@ -966,7 +1013,7 @@ const App: React.FC = () => {
             </div>
             
             {selectedPlace && (
-                <div className="absolute inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-md">
+                <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-md">
                     <div className="bg-white text-gray-800 w-full max-w-sm rounded-[2.5rem] overflow-hidden relative shadow-2xl animate-float flex flex-col max-h-[80vh]">
                         
                         <div className="relative h-48 shrink-0">
@@ -987,10 +1034,12 @@ const App: React.FC = () => {
                             <div className="mb-6">
                                 <div className="flex items-center gap-2 mb-2">
                                         <span className="bg-brandPink text-white text-xs font-black px-3 py-1 rounded-full">{selectedPlace.type}</span>
-                                        <div className="flex items-center gap-1 text-yellow-500 font-bold bg-yellow-50 px-2 py-1 rounded-lg">
-                                            <Star size={14} fill="currentColor"/>
-                                            <span className="text-sm">{selectedPlace.rating}</span>
-                                        </div>
+                                        {selectedPlace.rating && (
+                                            <div className="flex items-center gap-1 text-yellow-500 font-bold bg-yellow-50 px-2 py-1 rounded-lg">
+                                                <Star size={14} fill="currentColor"/>
+                                                <span className="text-sm">{selectedPlace.rating}</span>
+                                            </div>
+                                        )}
                                 </div>
                                 <h2 className="text-3xl font-black text-gray-800 leading-tight">{selectedPlace.name}</h2>
                             </div>
@@ -1012,19 +1061,23 @@ const App: React.FC = () => {
                                     </div>
                                     <div>
                                         <p className="text-xs text-gray-400 font-bold mb-1">영업 시간</p>
-                                        <p className="text-gray-700 font-bold">{selectedPlace.closingTime}까지 영업</p>
+                                        <p className="text-gray-700 font-bold">
+                                            {selectedPlace.closingTime ? `${selectedPlace.closingTime}까지 영업` : '심야 영업 검색 결과 (정확한 시간은 매장에 확인해주세요)'}
+                                        </p>
                                     </div>
                                 </div>
                                 
-                                <div className="flex items-start gap-4">
-                                    <div className="p-3 bg-gray-50 rounded-2xl text-brandPurple">
-                                        <Utensils size={20} />
+                                {selectedPlace.representativeMenu && (
+                                    <div className="flex items-start gap-4">
+                                        <div className="p-3 bg-gray-50 rounded-2xl text-brandPurple">
+                                            <Utensils size={20} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-gray-400 font-bold mb-1">대표 메뉴</p>
+                                            <p className="text-gray-700 font-bold">{selectedPlace.representativeMenu}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-xs text-gray-400 font-bold mb-1">대표 메뉴</p>
-                                        <p className="text-gray-700 font-bold">{selectedPlace.representativeMenu}</p>
-                                    </div>
-                                </div>
+                                )}
 
                                 <div className="bg-blue-50 p-5 rounded-3xl border border-blue-100">
                                     <p className="text-brandBlue font-medium leading-relaxed">"{selectedPlace.description}"</p>
@@ -1304,6 +1357,16 @@ const App: React.FC = () => {
                         </div>
                         <div className="flex-1 text-left">
                             <p className="font-bold text-gray-800 text-sm">개인정보처리방침</p>
+                        </div>
+                        <ChevronRight size={16} className="text-gray-300 shrink-0" />
+                    </button>
+                    <div className="mx-5 h-px bg-gray-50" />
+                    <button onClick={() => window.open('/terms', '_blank', 'noopener,noreferrer')} className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors active:bg-gray-100">
+                        <div className="w-10 h-10 rounded-2xl bg-gray-50 flex items-center justify-center shrink-0">
+                            <FileText size={18} className="text-gray-400" />
+                        </div>
+                        <div className="flex-1 text-left">
+                            <p className="font-bold text-gray-800 text-sm">이용약관</p>
                         </div>
                         <ChevronRight size={16} className="text-gray-300 shrink-0" />
                     </button>
@@ -1621,7 +1684,9 @@ const App: React.FC = () => {
       </div>
 
       <p className="text-center text-[11px] text-gray-300 font-medium mt-6 leading-relaxed">
-        가입 시 이용약관 및{' '}
+        가입 시{' '}
+        <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline">이용약관</a>
+        {' '}및{' '}
         <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline">개인정보처리방침</a>
         에 동의하게 됩니다.
       </p>
@@ -2092,16 +2157,18 @@ const App: React.FC = () => {
                                         loading="lazy"
                                     />
                                     <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-md text-[10px] font-bold text-gray-600">
-                                        {place.closingTime}
+                                        {place.closingTime || '🌙 심야'}
                                     </div>
                                 </div>
                                 <div className="p-3">
                                     <div className="flex justify-between items-start mb-1">
                                         <span className="text-[10px] font-bold bg-brandBlue/10 text-brandBlue px-2 py-0.5 rounded-full">{place.type}</span>
-                                        <div className="flex items-center gap-0.5">
-                                            <Star size={10} className="text-brandYellow fill-brandYellow" />
-                                            <span className="text-xs font-bold text-gray-700">{place.rating}</span>
-                                        </div>
+                                        {place.rating && (
+                                            <div className="flex items-center gap-0.5">
+                                                <Star size={10} className="text-brandYellow fill-brandYellow" />
+                                                <span className="text-xs font-bold text-gray-700">{place.rating}</span>
+                                            </div>
+                                        )}
                                     </div>
                                     <h4 className="font-bold text-gray-800 text-sm truncate mb-0.5">{place.name}</h4>
                                     <p className="text-[10px] text-gray-400 line-clamp-1">{place.address}</p>
@@ -2165,7 +2232,7 @@ const App: React.FC = () => {
         )}
         
         {selectedPlace && (
-              <div className="absolute inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-md">
+              <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-md">
                   <div className="bg-white text-gray-800 w-full max-w-sm rounded-[2.5rem] overflow-hidden relative shadow-2xl animate-float flex flex-col max-h-[80vh]">
                       
                       <div className="relative h-48 shrink-0">
@@ -2186,10 +2253,12 @@ const App: React.FC = () => {
                           <div className="mb-6">
                                <div className="flex items-center gap-2 mb-2">
                                     <span className="bg-brandPink text-white text-xs font-black px-3 py-1 rounded-full">{selectedPlace.type}</span>
-                                    <div className="flex items-center gap-1 text-yellow-500 font-bold bg-yellow-50 px-2 py-1 rounded-lg">
-                                        <Star size={14} fill="currentColor"/>
-                                        <span className="text-sm">{selectedPlace.rating}</span>
-                                    </div>
+                                    {selectedPlace.rating && (
+                                        <div className="flex items-center gap-1 text-yellow-500 font-bold bg-yellow-50 px-2 py-1 rounded-lg">
+                                            <Star size={14} fill="currentColor"/>
+                                            <span className="text-sm">{selectedPlace.rating}</span>
+                                        </div>
+                                    )}
                                </div>
                                <h2 className="text-3xl font-black text-gray-800 leading-tight">{selectedPlace.name}</h2>
                           </div>
@@ -2211,19 +2280,23 @@ const App: React.FC = () => {
                                   </div>
                                   <div>
                                       <p className="text-xs text-gray-400 font-bold mb-1">영업 시간</p>
-                                      <p className="text-gray-700 font-bold">{selectedPlace.closingTime}까지 영업</p>
+                                      <p className="text-gray-700 font-bold">
+                                          {selectedPlace.closingTime ? `${selectedPlace.closingTime}까지 영업` : '심야 영업 검색 결과 (정확한 시간은 매장에 확인해주세요)'}
+                                      </p>
                                   </div>
                               </div>
-                              
-                              <div className="flex items-start gap-4">
-                                  <div className="p-3 bg-gray-50 rounded-2xl text-brandPurple">
-                                      <Utensils size={20} />
+
+                              {selectedPlace.representativeMenu && (
+                                  <div className="flex items-start gap-4">
+                                      <div className="p-3 bg-gray-50 rounded-2xl text-brandPurple">
+                                          <Utensils size={20} />
+                                      </div>
+                                      <div>
+                                          <p className="text-xs text-gray-400 font-bold mb-1">대표 메뉴</p>
+                                          <p className="text-gray-700 font-bold">{selectedPlace.representativeMenu}</p>
+                                      </div>
                                   </div>
-                                  <div>
-                                      <p className="text-xs text-gray-400 font-bold mb-1">대표 메뉴</p>
-                                      <p className="text-gray-700 font-bold">{selectedPlace.representativeMenu}</p>
-                                  </div>
-                              </div>
+                              )}
 
                               <div className="bg-blue-50 p-5 rounded-3xl border border-blue-100">
                                   <p className="text-brandBlue font-medium leading-relaxed">"{selectedPlace.description}"</p>

@@ -59,7 +59,9 @@ const kakaoKeywordSearch = async (query: string, size = 1): Promise<{ lat: numbe
 };
 
 // ─── 네이버 지역 검색 (무료) ──────────────────────────────────────────────
-const naverLocalSearch = async (query: string, display = 1): Promise<{ name: string; address: string; lat: number; lon: number }[]> => {
+interface NaverPlace { name: string; category: string; address: string; lat: number; lon: number }
+
+const naverLocalSearch = async (query: string, display = 1): Promise<NaverPlace[]> => {
     try {
         const res = await fetch(
             `${NAVER_PROXY}?query=${encodeURIComponent(query)}&display=${display}`,
@@ -117,6 +119,59 @@ export const searchPoiSuggestions = async (query: string): Promise<PoiSuggestion
         console.error('POI 검색 오류:', e);
         return [];
     }
+};
+
+// ─── 심야 영업 장소 검색 (네이버 지역검색, 검색어에 "24시"/"포차" 등을 넣어
+// 네이버 자체 검색 랭킹이 관련도 높은 곳을 찾게 함 — 결과 title에 그 단어가
+// 그대로 들어있을 필요는 없음) ──────────────────────────────────────────
+export type OpenPlaceCategory = 'PUB' | 'FOOD' | 'CAFE';
+
+export interface OpenPlace {
+    id: string;
+    name: string;
+    category: string;
+    address: string;
+    lat: number;
+    lon: number;
+    distanceM: number;
+}
+
+const OPEN_PLACE_KEYWORDS: Record<OpenPlaceCategory, string[]> = {
+    PUB: ['포차', '24시 술집'],
+    FOOD: ['24시 식당', '해장국'],
+    CAFE: ['24시 카페'],
+};
+
+export const searchOpenPlaces = async (
+    anchorName: string,
+    userLat: number,
+    userLon: number,
+    categories: OpenPlaceCategory[] = ['PUB', 'FOOD', 'CAFE'],
+): Promise<OpenPlace[]> => {
+    const queries = categories.flatMap(c => OPEN_PLACE_KEYWORDS[c].map(kw => `${anchorName} ${kw}`));
+    const resultLists = await Promise.all(queries.map(q => naverLocalSearch(q, 5)));
+
+    const seen = new Set<string>();
+    const merged: OpenPlace[] = [];
+    for (const items of resultLists) {
+        for (const item of items) {
+            if (!item.lat || !item.lon) continue;
+            const key = `${item.name}_${item.address}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            merged.push({
+                id: key,
+                name: item.name,
+                category: item.category || '',
+                address: item.address,
+                lat: item.lat,
+                lon: item.lon,
+                distanceM: haversine(userLat, userLon, item.lat, item.lon),
+            });
+        }
+    }
+
+    return merged.sort((a, b) => a.distanceM - b.distanceM);
 };
 
 // ─── 좌표 → 주소 (OSM 역지오코딩 우선, 실패 시 카카오 폴백) ──────────────
