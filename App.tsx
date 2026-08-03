@@ -2121,7 +2121,7 @@ const App: React.FC = () => {
                 </div>
             )}
 
-            <AdSlot slot="RESULTS_LIST" className="rounded-2xl overflow-hidden" />
+            <AdSlot slot="4905063030" className="rounded-2xl overflow-hidden" />
 
         </div>
 
@@ -2430,7 +2430,7 @@ const App: React.FC = () => {
                 <span>택시 호출하기</span>
            </button>
 
-           <AdSlot slot="ROUTE_DETAIL" className="rounded-2xl overflow-hidden" />
+           <AdSlot slot="4905063030" className="rounded-2xl overflow-hidden" />
 
            {/* 택시 앱 선택 시트 */}
            {showTaxiSelector && (
