@@ -10,6 +10,7 @@ import DaumPostcode from 'react-daum-postcode';
 import RealTimeArrival from './components/RealTimeArrival';
 import TmapRouteView from './components/TmapRouteView';
 import PlaceSearchInput from './components/PlaceSearchInput';
+import AdSlot from './components/AdSlot';
 
 // 이벤트 트래킹 (fire-and-forget)
 const track = (event: 'visit' | 'search' | 'signup' | 'taxi') => {
@@ -1296,6 +1297,16 @@ const App: React.FC = () => {
                         </div>
                         <ChevronRight size={16} className="text-gray-300 shrink-0" />
                     </button>
+                    <div className="mx-5 h-px bg-gray-50" />
+                    <button onClick={() => window.open('/privacy', '_blank', 'noopener,noreferrer')} className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors active:bg-gray-100">
+                        <div className="w-10 h-10 rounded-2xl bg-gray-50 flex items-center justify-center shrink-0">
+                            <FileText size={18} className="text-gray-400" />
+                        </div>
+                        <div className="flex-1 text-left">
+                            <p className="font-bold text-gray-800 text-sm">개인정보처리방침</p>
+                        </div>
+                        <ChevronRight size={16} className="text-gray-300 shrink-0" />
+                    </button>
                     <div className="pb-2" />
                 </div>
 
@@ -1610,7 +1621,9 @@ const App: React.FC = () => {
       </div>
 
       <p className="text-center text-[11px] text-gray-300 font-medium mt-6 leading-relaxed">
-        가입 시 이용약관 및 개인정보처리방침에 동의하게 됩니다.
+        가입 시 이용약관 및{' '}
+        <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline">개인정보처리방침</a>
+        에 동의하게 됩니다.
       </p>
     </div>
   );
@@ -2108,6 +2121,8 @@ const App: React.FC = () => {
                 </div>
             )}
 
+            <AdSlot slot="RESULTS_LIST" className="rounded-2xl overflow-hidden" />
+
         </div>
 
         {isNotiModalOpen && (
@@ -2414,6 +2429,8 @@ const App: React.FC = () => {
                 <Car size={24} />
                 <span>택시 호출하기</span>
            </button>
+
+           <AdSlot slot="ROUTE_DETAIL" className="rounded-2xl overflow-hidden" />
 
            {/* 택시 앱 선택 시트 */}
            {showTaxiSelector && (
