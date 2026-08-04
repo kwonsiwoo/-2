@@ -136,9 +136,7 @@ export default function Admin() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-sm">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-200">
-              <span className="text-white text-2xl">🍺</span>
-            </div>
+            <img src="/icons/icon-512.png" alt="찐막차" className="w-16 h-16 rounded-2xl mx-auto mb-4 shadow-lg shadow-blue-200" />
             <h1 className="text-2xl font-black text-gray-800">찐막차 어드민</h1>
             <p className="text-gray-400 text-sm mt-1">관리자 전용 페이지입니다</p>
           </div>

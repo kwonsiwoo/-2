@@ -731,8 +731,8 @@ const App: React.FC = () => {
               <div className="absolute bottom-[-20%] right-[-20%] w-[400px] h-[400px] bg-brandPink/30 rounded-full blur-[80px]"></div>
 
               <div className="text-center z-10 p-6 flex flex-col items-center">
-                  <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center mb-8 shadow-2xl animate-bounce">
-                      <Beer className="w-16 h-16 text-brandBlue transform -rotate-12" strokeWidth={2.5} />
+                  <div className="w-32 h-32 flex items-center justify-center mb-8 animate-bounce">
+                      <img src="/icons/icon-512.png" alt="찐막차" className="w-full h-full drop-shadow-2xl" />
                   </div>
                   
                   <h1 className="text-6xl font-black mb-6 tracking-tighter drop-shadow-md">
@@ -773,11 +773,9 @@ const App: React.FC = () => {
             <div className="flex justify-center mb-6">
                 <div className="relative w-36 h-36 animate-float">
                      <div className="absolute inset-0 bg-brandBlue/30 rounded-full blur-2xl"></div>
-                     <div className="relative w-full h-full rounded-full border-8 border-white flex items-center justify-center bg-brandBlue shadow-2xl">
-                         <Beer className="w-16 h-16 text-white transform -rotate-12" />
-                         <div className="absolute top-0 right-0 bg-brandPink text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg transform rotate-12">
-                             막차 구조대
-                         </div>
+                     <img src="/icons/icon-512.png" alt="찐막차" className="relative w-full h-full drop-shadow-2xl" />
+                     <div className="absolute top-0 right-0 bg-brandPink text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg transform rotate-12">
+                         막차 구조대
                      </div>
                 </div>
             </div>
@@ -1627,11 +1625,9 @@ const App: React.FC = () => {
           <div className="flex justify-center mb-6">
             <div className="relative w-28 h-28 animate-float">
               <div className="absolute inset-0 bg-brandBlue/30 rounded-full blur-2xl" />
-              <div className="relative w-full h-full rounded-full border-8 border-white flex items-center justify-center bg-brandBlue shadow-2xl">
-                <Beer className="w-12 h-12 text-white transform -rotate-12" />
-                <div className="absolute top-0 right-0 bg-brandPink text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg transform rotate-12">
-                  막차 구조대
-                </div>
+              <img src="/icons/icon-512.png" alt="찐막차" className="relative w-full h-full drop-shadow-2xl" />
+              <div className="absolute top-0 right-0 bg-brandPink text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg transform rotate-12">
+                막차 구조대
               </div>
             </div>
           </div>
@@ -2749,9 +2745,7 @@ const App: React.FC = () => {
                    <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-6" />
                    {/* 아이콘 */}
                    <div className="flex justify-center mb-4">
-                       <div className="w-16 h-16 rounded-full bg-brandBlue flex items-center justify-center shadow-lg shadow-blue-200">
-                           <Beer size={28} className="text-white -rotate-12" />
-                       </div>
+                       <img src="/icons/icon-512.png" alt="찐막차" className="w-16 h-16 rounded-2xl shadow-lg shadow-blue-200" />
                    </div>
                    <p className="text-center text-xl font-black text-gray-800 leading-snug mb-2">
                        오늘 더 오래 놀고<br/>더 싸게 귀가하세요 🍻
@@ -2779,9 +2773,7 @@ const App: React.FC = () => {
        {showInstallBanner && (
          <div className="absolute bottom-0 left-0 right-0 z-[85] p-4 animate-in slide-in-from-bottom-4 duration-300">
            <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 flex items-center gap-3">
-             <div className="w-12 h-12 rounded-xl bg-brandBlue flex items-center justify-center shrink-0 shadow-md shadow-blue-200">
-               <span className="text-2xl">🍺</span>
-             </div>
+             <img src="/icons/icon-512.png" alt="찐막차" className="w-12 h-12 rounded-xl shrink-0 shadow-md shadow-blue-200" />
              <div className="flex-1 min-w-0">
                <p className="font-black text-gray-800 text-sm">앱으로 더 편하게!</p>
                {isIOS ? (
