@@ -49,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.json({ arrivals: [], stationName, nodeId });
     }
     const arrivals = toItems(arrivalData).map((item: any) => ({
-      routeNo: item.routeno || '',
+      routeNo: String(item.routeno ?? ''),
       routeId: item.routeid || '',
       arrtime: Number(item.arrtime || 0),      // 초
       remainStop: Number(item.arrprevstationcnt || 0),
