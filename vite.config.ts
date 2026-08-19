@@ -126,7 +126,7 @@ export default defineConfig(({ mode }) => {
                                 const arrivalRes = await fetch(arrivalUrl);
                                 const arrivalData = await arrivalRes.json();
                                 let arrivals = toItems(arrivalData).map((item: any) => ({
-                                    routeNo: item.routeno || '',
+                                    routeNo: String(item.routeno ?? ''),
                                     routeId: item.routeid || '',
                                     arrtime: Number(item.arrtime || 0),
                                     remainStop: Number(item.arrprevstationcnt || 0),
