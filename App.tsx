@@ -10,7 +10,6 @@ import DaumPostcode from 'react-daum-postcode';
 import RealTimeArrival from './components/RealTimeArrival';
 import TmapRouteView from './components/TmapRouteView';
 import PlaceSearchInput from './components/PlaceSearchInput';
-import AdSlot from './components/AdSlot';
 
 // 이벤트 트래킹 (fire-and-forget)
 const track = (event: 'visit' | 'search' | 'signup' | 'taxi') => {
@@ -2184,8 +2183,6 @@ const App: React.FC = () => {
                 </div>
             )}
 
-            <AdSlot slot="4905063030" className="rounded-2xl overflow-hidden" />
-
         </div>
 
         {isNotiModalOpen && (
@@ -2498,8 +2495,6 @@ const App: React.FC = () => {
                 <Car size={24} />
                 <span>택시 호출하기</span>
            </button>
-
-           <AdSlot slot="4905063030" className="rounded-2xl overflow-hidden" />
 
            {/* 택시 앱 선택 시트 */}
            {showTaxiSelector && (
