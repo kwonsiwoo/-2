@@ -215,19 +215,6 @@ const TmapRouteView: React.FC<Props> = ({ route, height = '40vh' }) => {
         }
       });
 
-      // ── 출발 마커 (초록) ──────────────────────────────────────────
-      const startName = segments[0]?.startName || '출발';
-      addOverlay(map, kakao, allCoords[0].lat, allCoords[0].lng, `
-        <div style="display:flex;flex-direction:column;align-items:center;gap:3px;pointer-events:none;">
-          <div style="width:42px;height:42px;background:#22C55E;border:3.5px solid white;border-radius:50%;
-            display:flex;align-items:center;justify-content:center;
-            box-shadow:0 4px 16px rgba(34,197,94,0.45);font-size:20px;">📍</div>
-          <div style="background:#22C55E;color:white;border-radius:10px;padding:3px 10px;
-            font-size:10px;font-weight:900;white-space:nowrap;max-width:100px;
-            overflow:hidden;text-overflow:ellipsis;box-shadow:0 2px 8px rgba(34,197,94,0.35);">
-            ${startName}
-          </div>
-        </div>`);
 
       // ── 도착 마커 (빨강): 실제 목적지 좌표 우선, 없으면 마지막 경로 좌표 사용 ──
       const lastSeg = segments[segments.length - 1];
@@ -235,7 +222,7 @@ const TmapRouteView: React.FC<Props> = ({ route, height = '40vh' }) => {
       const destLat = route.destLat ?? allCoords[allCoords.length - 1].lat;
       const destLng = route.destLng ?? allCoords[allCoords.length - 1].lng;
       addOverlay(map, kakao, destLat, destLng, `
-        <div style="display:flex;flex-direction:column;align-items:center;gap:3px;pointer-events:none;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;">
           <div style="width:42px;height:42px;background:#EF4444;border:3.5px solid white;border-radius:50%;
             display:flex;align-items:center;justify-content:center;
             box-shadow:0 4px 16px rgba(239,68,68,0.45);font-size:20px;">🏠</div>
@@ -260,7 +247,7 @@ const TmapRouteView: React.FC<Props> = ({ route, height = '40vh' }) => {
         const num   = stepNum++;
 
         addOverlay(map, kakao, pos.lat, pos.lng, `
-          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;pointer-events:none;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;">
             <div style="position:relative;">
               <div style="width:38px;height:38px;background:${color};border:3px solid white;border-radius:50%;
                 display:flex;align-items:center;justify-content:center;
