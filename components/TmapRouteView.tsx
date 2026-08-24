@@ -64,6 +64,22 @@ const loadKakaoSDK = (): Promise<void> => {
 // ─── OSRM 도보 경로 (무료, API 키 불필요) ────────────────────────────────
 const walkPathCache = new Map<string, { lat: number; lng: number }[]>();
 
+function haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function pathLengthM(path: { lat: number; lng: number }[]): number {
+  let total = 0;
+  for (let i = 1; i < path.length; i++) {
+    total += haversineM(path[i - 1].lat, path[i - 1].lng, path[i].lat, path[i].lng);
+  }
+  return total;
+}
+
 async function fetchWalkPath(
   startLat: number, startLng: number,
   endLat: number,   endLng: number,
@@ -77,6 +93,12 @@ async function fetchWalkPath(
     const coords: number[][] = data.routes?.[0]?.geometry?.coordinates;
     if (coords?.length >= 2) {
       const path = coords.map(([lng, lat]) => ({ lat, lng }));
+      // OSRM 한국 보행자 데이터가 시장·골목 등에서 부실해 엉뚱하게 크게
+      // 우회하는 경로를 줄 때가 있음 — 직선거리 대비 과도하게 길면 버림
+      const straight = haversineM(startLat, startLng, endLat, endLng);
+      if (pathLengthM(path) > straight * 2.2 + 150) {
+        return [];
+      }
       walkPathCache.set(key, path);
       return path;
     }
@@ -96,13 +118,34 @@ const TmapRouteView: React.FC<Props> = ({ route, height = '40vh' }) => {
   const mapInst   = useRef<any>(null);
   const overlays  = useRef<any[]>([]);
   const plines    = useRef<any[]>([]);
+  const myLocOverlay = useRef<any>(null);
+  const watchIdRef = useRef<number | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [isTracking, setIsTracking] = useState(false);
+
+  const stopTracking = () => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setIsTracking(false);
+  };
 
   const clearMap = () => {
     overlays.current.forEach(o => o.setMap(null));
     overlays.current = [];
     plines.current.forEach(p => p.setMap(null));
     plines.current = [];
+    // 지도가 통째로 교체되는 상황이므로 실시간 추적도 같이 끊어야 함 —
+    // 안 하면 이전 지도용 watch가 계속 돌면서 사라진 마커를 갱신하려 함
+    stopTracking();
+    // 지도 인스턴스 자체가 교체되므로(경로 재조회 등) 이전 지도에 붙어있던
+    // 내 위치 마커 참조도 함께 정리 — 안 하면 새 지도엔 안 보이는데 참조는 살아있어
+    // setPosition()이 조용히 무시되고, 다음 클릭 때도 마커가 안 뜨는 상태가 됨
+    if (myLocOverlay.current) {
+      myLocOverlay.current.setMap(null);
+      myLocOverlay.current = null;
+    }
   };
 
   const addOverlay = (map: any, kakao: any, lat: number, lng: number, html: string, yAnchor = 1.1) => {
@@ -279,24 +322,60 @@ const TmapRouteView: React.FC<Props> = ({ route, height = '40vh' }) => {
     return () => { cancelled = true; clearMap(); };
   }, [route]);
 
+  // 마커가 있으면 위치만 옮기고(setPosition), 없을 때만 새로 생성 — 클릭마다
+  // 새로 만들면 이전 마커가 지도에 남아 계속 쌓이던 버그라 반드시 재사용해야 함
+  const placeMyLocMarker = (map: any, kakao: any, lat: number, lng: number, pan: boolean) => {
+    const pos = new kakao.maps.LatLng(lat, lng);
+    if (pan) map.panTo(pos);
+    if (myLocOverlay.current) {
+      myLocOverlay.current.setPosition(pos);
+    } else {
+      myLocOverlay.current = new kakao.maps.CustomOverlay({
+        position: pos,
+        content: `<div style="width:20px;height:20px;background:#3B82F6;border:3px solid white;
+          border-radius:50%;box-shadow:0 0 0 6px rgba(59,130,246,0.2);"></div>`,
+        yAnchor: 0.5,
+      });
+      myLocOverlay.current.setMap(map);
+    }
+  };
+
+  // 1번째 클릭: 현재 위치를 한 번만 잡아서 보여줌
+  // 2번째 클릭(이미 위치를 잡아둔 상태): 실시간 추적 모드 시작 — watchPosition으로
+  // 위치가 바뀔 때마다 마커가 자연스럽게 따라오도록 함
+  // 추적 중 다시 클릭: 추적은 끄지 않고 현재 위치로 지도만 다시 중심 이동
   const goToMyLocation = useCallback(() => {
     const map = mapInst.current;
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const kakao: any = (window as any).kakao;
+    /* eslint-enable */
     if (!map) return;
-    navigator.geolocation.getCurrentPosition(
-      ({ coords: { latitude: lat, longitude: lng } }) => {
-        /* eslint-disable @typescript-eslint/no-explicit-any */
-        const kakao: any = (window as any).kakao;
-        /* eslint-enable */
-        const pos = new kakao.maps.LatLng(lat, lng);
-        map.panTo(pos);
-        addOverlay(map, kakao, lat, lng, `
-          <div style="width:20px;height:20px;background:#3B82F6;border:3px solid white;
-            border-radius:50%;box-shadow:0 0 0 6px rgba(59,130,246,0.2);"></div>`, 0.5);
-      },
-      () => alert('위치 정보를 가져올 수 없습니다.'),
-      { enableHighAccuracy: true, timeout: 10000 },
+
+    if (isTracking) {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords: { latitude: lat, longitude: lng } }) => placeMyLocMarker(map, kakao, lat, lng, true),
+        () => {},
+        { enableHighAccuracy: true, timeout: 10000 },
+      );
+      return;
+    }
+
+    if (!myLocOverlay.current) {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords: { latitude: lat, longitude: lng } }) => placeMyLocMarker(map, kakao, lat, lng, true),
+        () => alert('위치 정보를 가져올 수 없습니다.'),
+        { enableHighAccuracy: true, timeout: 10000 },
+      );
+      return;
+    }
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      ({ coords: { latitude: lat, longitude: lng } }) => placeMyLocMarker(map, kakao, lat, lng, true),
+      () => {},
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
     );
-  }, []);
+    setIsTracking(true);
+  }, [isTracking]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height, overflow: 'hidden' }}>
@@ -309,18 +388,19 @@ const TmapRouteView: React.FC<Props> = ({ route, height = '40vh' }) => {
       )}
       <button
         onClick={goToMyLocation}
-        title="현재 위치로 이동"
+        title={isTracking ? '실시간 추적 중 (탭하면 현재 위치로 재중심)' : '현재 위치로 이동'}
         style={{
           position: 'absolute', bottom: '100px', right: '12px', zIndex: 1000,
-          width: '44px', height: '44px', background: 'white', border: 'none',
+          width: '44px', height: '44px', background: isTracking ? '#3B82F6' : 'white', border: 'none',
           borderRadius: '50%', cursor: 'pointer', fontSize: '21px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 3px 14px rgba(0,0,0,0.18)', transition: 'transform 0.15s',
+          boxShadow: isTracking ? '0 3px 14px rgba(59,130,246,0.5)' : '0 3px 14px rgba(0,0,0,0.18)',
+          transition: 'transform 0.15s, background 0.15s',
         }}
         onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.9)')}
         onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
       >
-        📍
+        {isTracking ? '🧭' : '📍'}
       </button>
     </div>
   );
