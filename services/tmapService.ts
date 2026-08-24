@@ -255,6 +255,35 @@ async function fetchDrivingRoute(
     const key = `${startLat.toFixed(5)},${startLon.toFixed(5)}->${endLat.toFixed(5)},${endLon.toFixed(5)}`;
     if (drivingCache.has(key)) return drivingCache.get(key)!;
 
+    // 카카오모빌리티 자동차 길찾기로 실제 도로 경로 우선 시도
+    try {
+        const origin = `${startLon},${startLat}`;
+        const destination = `${endLon},${endLat}`;
+        const res = await fetch(`/api/kakao-directions?origin=${origin}&destination=${destination}`);
+        const data = await res.json();
+        const route = data.routes?.[0];
+        if (route?.result_code === 0) {
+            const path: { lat: number; lng: number }[] = [];
+            for (const road of route.sections?.[0]?.roads || []) {
+                const v: number[] = road.vertexes || [];
+                for (let i = 0; i < v.length; i += 2) {
+                    path.push({ lat: v[i + 1], lng: v[i] });
+                }
+            }
+            if (path.length >= 2) {
+                const result: DrivingResult = {
+                    distanceM: route.summary.distance,
+                    durationSec: route.summary.duration,
+                    path,
+                };
+                drivingCache.set(key, result);
+                return result;
+            }
+        }
+    } catch {
+        // 아래 직선거리 추정으로 폴백
+    }
+
     const straightM = haversine(startLat, startLon, endLat, endLon);
     const distanceM = straightM * 1.3;
     const durationSec = (distanceM / 1000 / 30) * 3600; // 평균 30km/h
@@ -278,7 +307,7 @@ export const getDrivingRoutePath = async (
     return r?.path ?? [];
 };
 
-// ─── 도보 경로 — Haversine × 1.2 추정 ────────────────────────────────────
+// ─── 도보 경로 — 카카오맵 도보 길찾기 우선, 실패 시 Haversine × 1.2 추정 ──
 type WalkingResult = { distanceM: number; durationSec: number; path: { lat: number; lng: number }[] };
 const walkingCache = new Map<string, WalkingResult>();
 
@@ -287,6 +316,32 @@ async function fetchWalkingRoute(
 ): Promise<WalkingResult | null> {
     const key = `${startLat.toFixed(5)},${startLon.toFixed(5)}->${endLat.toFixed(5)},${endLon.toFixed(5)}`;
     if (walkingCache.has(key)) return walkingCache.get(key)!;
+
+    try {
+        const res = await fetch(`/api/kakao-walk?start_x=${startLon}&start_y=${startLat}&end_x=${endLon}&end_y=${endLat}`);
+        const data = await res.json();
+        if (data.status === 'OK' && data.route?.legs?.length) {
+            const path: { lat: number; lng: number }[] = [];
+            for (const leg of data.route.legs) {
+                for (const step of leg.steps || []) {
+                    for (const [lon, lat] of step.path?.points || []) {
+                        path.push({ lat, lng: lon });
+                    }
+                }
+            }
+            if (path.length >= 2) {
+                const result: WalkingResult = {
+                    distanceM: data.route.properties.totalDistance,
+                    durationSec: data.route.properties.totalTime,
+                    path,
+                };
+                walkingCache.set(key, result);
+                return result;
+            }
+        }
+    } catch {
+        // 아래 직선거리 추정으로 폴백
+    }
 
     const straightM = haversine(startLat, startLon, endLat, endLon);
     const distanceM = straightM * 1.2;

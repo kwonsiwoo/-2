@@ -17,6 +17,9 @@ export default defineConfig(({ mode }) => {
     const SEOUL_BUS_BASE = 'http://ws.bus.go.kr/api/rest';
     const ODSAY_BASE = 'https://api.odsay.com/v1/api';
     const KAKAO_LOCAL_BASE = 'https://dapi.kakao.com/v2/local';
+    const KAKAO_TRANSIT_BASE = 'https://dapi.kakao.com/v2/routing/publictraffic';
+    const KAKAO_DIRECTIONS_BASE = 'https://apis-navi.kakaomobility.com/v1/directions';
+    const KAKAO_WALK_BASE = 'https://dapi.kakao.com/v2/routing/walk';
     const NAVER_LOCAL_BASE = 'https://openapi.naver.com/v1/search/local.json';
     const stripTags = (s: string): string => s.replace(/<[^>]*>/g, '');
 
@@ -331,6 +334,112 @@ export default defineConfig(({ mode }) => {
                             params.delete('type');
                             try {
                                 const r = await fetch(`${KAKAO_LOCAL_BASE}${kakaoPath}?${params.toString()}`, {
+                                    headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` },
+                                });
+                                const data = await r.json();
+                                res.statusCode = r.status;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify(data));
+                            } catch (e: any) {
+                                res.statusCode = 500;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ error: e.message }));
+                            }
+                            return;
+                        }
+
+                        // 카카오모빌리티 자동차 길찾기 프록시 (택시/드라이빙 구간 실제 도로 경로용)
+                        if (url.startsWith('/api/kakao-directions')) {
+                            const params = new URLSearchParams(url.split('?')[1] || '');
+                            const origin = params.get('origin') || '';
+                            const destination = params.get('destination') || '';
+                            if (!KAKAO_REST_KEY) {
+                                res.statusCode = 500;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ error: 'KAKAO_REST_API_KEY 환경변수가 설정되지 않았습니다' }));
+                                return;
+                            }
+                            if (!origin || !destination) {
+                                res.statusCode = 400;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ error: 'origin, destination이 필요합니다' }));
+                                return;
+                            }
+                            try {
+                                const qs = new URLSearchParams({ origin, destination }).toString();
+                                const r = await fetch(`${KAKAO_DIRECTIONS_BASE}?${qs}`, {
+                                    headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` },
+                                });
+                                const data = await r.json();
+                                res.statusCode = r.status;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify(data));
+                            } catch (e: any) {
+                                res.statusCode = 500;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ error: e.message }));
+                            }
+                            return;
+                        }
+
+                        // 카카오맵 도보 길찾기 프록시 (도보 구간 실제 보행 경로용)
+                        if (url.startsWith('/api/kakao-walk')) {
+                            const params = new URLSearchParams(url.split('?')[1] || '');
+                            const start_x = params.get('start_x') || '';
+                            const start_y = params.get('start_y') || '';
+                            const end_x = params.get('end_x') || '';
+                            const end_y = params.get('end_y') || '';
+                            if (!KAKAO_REST_KEY) {
+                                res.statusCode = 500;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ error: 'KAKAO_REST_API_KEY 환경변수가 설정되지 않았습니다' }));
+                                return;
+                            }
+                            if (!start_x || !start_y || !end_x || !end_y) {
+                                res.statusCode = 400;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ error: 'start_x, start_y, end_x, end_y가 필요합니다' }));
+                                return;
+                            }
+                            try {
+                                const qs = new URLSearchParams({ start_x, start_y, end_x, end_y, input_coord: 'WGS84' }).toString();
+                                const r = await fetch(`${KAKAO_WALK_BASE}?${qs}`, {
+                                    headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` },
+                                });
+                                const data = await r.json();
+                                res.statusCode = r.status;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify(data));
+                            } catch (e: any) {
+                                res.statusCode = 500;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ error: e.message }));
+                            }
+                            return;
+                        }
+
+                        // 카카오 대중교통 길찾기 프록시 (ODsay 쿼터 초과 시 폴백)
+                        if (url.startsWith('/api/kakao-transit')) {
+                            const params = new URLSearchParams(url.split('?')[1] || '');
+                            const start_x = params.get('start_x') || '';
+                            const start_y = params.get('start_y') || '';
+                            const end_x = params.get('end_x') || '';
+                            const end_y = params.get('end_y') || '';
+                            if (!KAKAO_REST_KEY) {
+                                res.statusCode = 500;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ error: 'KAKAO_REST_API_KEY 환경변수가 설정되지 않았습니다' }));
+                                return;
+                            }
+                            if (!start_x || !start_y || !end_x || !end_y) {
+                                res.statusCode = 400;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ error: 'start_x, start_y, end_x, end_y가 필요합니다' }));
+                                return;
+                            }
+                            try {
+                                const qs = new URLSearchParams({ start_x, start_y, end_x, end_y, input_coord: 'WGS84' }).toString();
+                                const r = await fetch(`${KAKAO_TRANSIT_BASE}?${qs}`, {
                                     headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` },
                                 });
                                 const data = await r.json();

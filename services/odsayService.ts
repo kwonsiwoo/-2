@@ -121,6 +121,94 @@ const makeToHHMM = (baseMs: number) => (offsetMinutes: number): string => {
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 };
 
+// ─── 카카오 대중교통 길찾기 → ODsay path 형식 변환 (ODsay 쿼터 초과 폴백용) ──
+// 아래 buildSegments 등 기존 로직이 ODsay의 path.info / path.subPath 형태를
+// 그대로 기대하므로, 데이터 출처만 카카오로 바꾸고 형태는 동일하게 맞춰줌.
+// 카카오는 정류장 좌표를 안 주는 대신 구간 전체 폴리라인을 줘서, 실제 도로/
+// 선로를 따라가는 더 정밀한 경로를 그릴 수 있음 → sub._fullPath로 별도 전달.
+// 접근 도보 최소 거리 — 이보다 가까우면 이미 승강장 앞이라 도보 구간 생략
+const MIN_ACCESS_WALK_KM = 0.015;
+
+// 카카오는 정류장 좌표를 안 주는 대신 구간 전체 폴리라인을 줘서, 실제 도로/
+// 선로를 따라가는 더 정밀한 경로를 그릴 수 있음 → sub._fullPath로 별도 전달.
+// 단, ODsay와 달리 "출발지→첫 승차 정류장"/"마지막 하차 정류장→도착지" 도보는
+// 응답에 포함되지 않으므로 origin/dest 좌표로 직접 보정해서 끼워 넣어야 함.
+function kakaoRouteToOdsayPath(
+  route: any, originLat: number, originLon: number, destLat: number, destLon: number,
+): any {
+  const props = route.properties || {};
+  const subPath = (route.steps || []).map((step: any) => {
+    const p = step.properties || {};
+    const trafficType = p.type === 'SUBWAY' ? 1 : p.type === 'BUS' ? 2 : 3; // 1=지하철 2=버스 그외=도보
+    const points: number[][] = step.path?.points || [];
+    const first = points[0] || [];
+    const last = points[points.length - 1] || [];
+    const vehicles = p.vehicles || [];
+    const stops = p.stops || [];
+    return {
+      trafficType,
+      sectionTime: Math.round((p.time || 0) / 60),
+      lane: vehicles.map((v: any) => ({ name: v.name, busNo: v.name })),
+      startName: stops[0]?.name || '',
+      endName: stops[stops.length - 1]?.name || '',
+      startX: first[0], startY: first[1],
+      endX: last[0], endY: last[1],
+      // 이름만(좌표 없음) — nextStationName 방향 판별용
+      passStopList: { stations: stops.map((s: any) => ({ stationName: s.name })) },
+      // 실제 폴리라인 — buildSegments에서 정류장 좌표보다 우선 사용
+      _fullPath: points.map(([lon, lat]) => ({ lat, lng: lon })),
+    };
+  });
+
+  // 출발지 → 첫 승차 지점 도보 보정
+  const firstSub = subPath[0];
+  if (firstSub && haversineKm(originLat, originLon, firstSub.startY, firstSub.startX) >= MIN_ACCESS_WALK_KM) {
+    subPath.unshift({
+      trafficType: 3,
+      sectionTime: 0,
+      lane: [],
+      startName: '',
+      endName: firstSub.startName,
+      startX: originLon, startY: originLat,
+      endX: firstSub.startX, endY: firstSub.startY,
+      passStopList: { stations: [] },
+    });
+  }
+
+  // 마지막 하차 지점 → 도착지 도보 보정
+  const lastSub = subPath[subPath.length - 1];
+  if (lastSub && haversineKm(lastSub.endY, lastSub.endX, destLat, destLon) >= MIN_ACCESS_WALK_KM) {
+    subPath.push({
+      trafficType: 3,
+      sectionTime: 0,
+      lane: [],
+      startName: lastSub.endName,
+      endName: '',
+      startX: lastSub.endX, startY: lastSub.endY,
+      endX: destLon, endY: destLat,
+      passStopList: { stations: [] },
+    });
+  }
+
+  return {
+    info: { totalTime: Math.round((props.totalTime || 0) / 60), payment: props.fare?.value || 0, totalFare: props.fare?.value || 0 },
+    subPath,
+  };
+}
+
+// 카카오 대중교통 길찾기 호출 → ODsay data.result.path와 동일한 배열 형태로 반환
+async function fetchKakaoTransitPaths(
+  startLat: number, startLon: number, endLat: number, endLon: number,
+): Promise<any[]> {
+  const url = `/api/kakao-transit?start_x=${startLon}&start_y=${startLat}&end_x=${endLon}&end_y=${endLat}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.status !== 'OK' || !data.routes?.length) {
+    throw new Error(`카카오 대중교통 오류: ${JSON.stringify(data)}`);
+  }
+  return data.routes.map((route: any) => kakaoRouteToOdsayPath(route, startLat, startLon, endLat, endLon));
+}
+
 // 사용자 미설정 기본 도보 임계값
 const DEFAULT_WALK_THRESHOLD = 20;
 // 택시 탑승 최소 도보 시간 (이하면 절대 택시 대체 안 함)
@@ -376,9 +464,11 @@ async function buildSegments(path: any, baseMs: number): Promise<RouteSegment[]>
     const stations: any[] = sub.passStopList?.stations || [];
     const segPath: { lat: number; lng: number }[] = [];
 
-    // 도보 구간: Tmap 실제 경로 우선, 없으면 직선 fallback
+    // 도보 구간: Tmap 실제 경로 우선, 카카오 폴리라인 차선, 없으면 직선 fallback
     if (type === 'walk' && walkPath?.length >= 2) {
       segPath.push(...walkPath);
+    } else if (sub._fullPath?.length >= 2) {
+      segPath.push(...sub._fullPath);
     } else {
       stations.forEach((s: any) => {
         if (s.x && s.y) segPath.push({ lat: Number(s.y), lng: Number(s.x) });
@@ -759,16 +849,24 @@ export const getOdsayTransitRoutes = async (
     url += `&SearchDate=${sDate}&SearchTime=${sTime}`;
   }
 
-  const res  = await fetch(url);
-  const data = await res.json();
-
-  if (data.error) {
-    throw new Error(`ODsay 오류: ${data.error.message || data.error.msg || JSON.stringify(data.error)}`);
-  }
-
-  const allPaths = data.result?.path;
-  if (!allPaths || allPaths.length === 0) {
-    throw new Error(`경로를 찾을 수 없습니다. (status: ${JSON.stringify(data.result?.status ?? data.result)})`);
+  let allPaths: any[] | undefined;
+  try {
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (data.error) {
+      throw new Error(`ODsay 오류: ${data.error.message || data.error.msg || JSON.stringify(data.error)}`);
+    }
+    allPaths = data.result?.path;
+    if (!allPaths || allPaths.length === 0) {
+      throw new Error(`경로를 찾을 수 없습니다. (status: ${JSON.stringify(data.result?.status ?? data.result)})`);
+    }
+  } catch (odsayErr) {
+    // ODsay 실패(쿼터 초과 등) 시 카카오 대중교통 길찾기로 폴백
+    try {
+      allPaths = await fetchKakaoTransitPaths(startCoords.lat, startCoords.lon, endCoords.lat, endCoords.lon);
+    } catch {
+      throw odsayErr;
+    }
   }
 
   let paths: any[];
