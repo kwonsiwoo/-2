@@ -842,30 +842,37 @@ export const getOdsayTransitRoutes = async (
     throw new Error('출발지 또는 도착지 좌표를 찾을 수 없습니다.');
   }
 
-  let url = `/api/odsay?SX=${startCoords.lon}&SY=${startCoords.lat}&EX=${endCoords.lon}&EY=${endCoords.lat}`;
+  // ODsay 폴백용 URL — 시각 지정(SearchDate/SearchTime)이 필요할 때만 사용
+  let odsayUrl = `/api/odsay?SX=${startCoords.lon}&SY=${startCoords.lat}&EX=${endCoords.lon}&EY=${endCoords.lat}`;
   if (departureDate) {
     const sDate = `${departureDate.getFullYear()}${pad2(departureDate.getMonth() + 1)}${pad2(departureDate.getDate())}`;
     const sTime = `${pad2(departureDate.getHours())}${pad2(departureDate.getMinutes())}`;
-    url += `&SearchDate=${sDate}&SearchTime=${sTime}`;
+    odsayUrl += `&SearchDate=${sDate}&SearchTime=${sTime}`;
   }
 
-  let allPaths: any[] | undefined;
-  try {
-    const res  = await fetch(url);
+  const fetchFromOdsay = async (): Promise<any[]> => {
+    const res  = await fetch(odsayUrl);
     const data = await res.json();
     if (data.error) {
       throw new Error(`ODsay 오류: ${data.error.message || data.error.msg || JSON.stringify(data.error)}`);
     }
-    allPaths = data.result?.path;
-    if (!allPaths || allPaths.length === 0) {
+    const p = data.result?.path;
+    if (!p || p.length === 0) {
       throw new Error(`경로를 찾을 수 없습니다. (status: ${JSON.stringify(data.result?.status ?? data.result)})`);
     }
-  } catch (odsayErr) {
-    // ODsay 실패(쿼터 초과 등) 시 카카오 대중교통 길찾기로 폴백
+    return p;
+  };
+
+  // 카카오 대중교통 길찾기를 메인으로 사용 — 시각 지정은 아래 isPathRunnable()
+  // 기반 스케줄 필터로 보정. 카카오 실패/무결과 시에만 ODsay로 폴백.
+  let allPaths: any[] | undefined;
+  try {
+    allPaths = await fetchKakaoTransitPaths(startCoords.lat, startCoords.lon, endCoords.lat, endCoords.lon);
+  } catch (kakaoErr) {
     try {
-      allPaths = await fetchKakaoTransitPaths(startCoords.lat, startCoords.lon, endCoords.lat, endCoords.lon);
+      allPaths = await fetchFromOdsay();
     } catch {
-      throw odsayErr;
+      throw kakaoErr;
     }
   }
 
