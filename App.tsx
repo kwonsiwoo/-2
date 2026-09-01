@@ -376,9 +376,10 @@ const App: React.FC = () => {
               })
               .finally(() => setLdtLoading(false));
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      setError("오류가 났어요... 다시 시도해주세요! 😵‍💫");
+      const detail = e?.message ? `\n(${e.message})` : '';
+      setError(`오류가 났어요... 다시 시도해주세요! 😵‍💫${detail}`);
       setAppState(AppState.HOME);
     } finally {
       setIsLoading(false);
@@ -836,7 +837,7 @@ const App: React.FC = () => {
                 )}
             </button>
           </div>
-          {error && <p className="text-brandPink text-center text-sm font-bold animate-bounce">{error}</p>}
+          {error && <p className="text-brandPink text-center text-sm font-bold animate-bounce whitespace-pre-line">{error}</p>}
         </div>
       </div>
 
