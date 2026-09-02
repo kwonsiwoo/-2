@@ -1,8 +1,10 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { MapPin, Navigation, Bus, Train, ArrowRight, ChevronLeft, Search, Beer, Car, Clock, Sparkles, User, CreditCard, Home, Settings, Edit2, Bell, ToggleLeft, ToggleRight, Store, Star, X, Utensils, BellRing, Shield, TrendingUp, Phone, Footprints, ChevronRight, FileText, Plus, Coffee, Wine, Mail, Camera } from 'lucide-react';
+import { MapPin, Navigation, Bus, Train, ArrowRight, ChevronLeft, Search, Beer, Car, Clock, Sparkles, User, CreditCard, Home, Settings, Edit2, Bell, ToggleLeft, ToggleRight, Store, Star, X, Utensils, BellRing, Shield, TrendingUp, Phone, Footprints, ChevronRight, FileText, Plus, Coffee, Wine, Mail, Camera, Trash2 } from 'lucide-react';
 import { getOdsayTransitRoutes } from './services/odsayService';
 import { reverseGeocode, setCachedCoordinates, getCoordinates, searchOpenPlaces, OpenPlace, OpenPlaceCategory } from './services/tmapService';
 import { findLatestDeparture } from './services/latestDepartureService';
+import { ensureAnonymousSession } from './services/supabaseClient';
+import { listFavorites, addFavorite, updateFavorite, deleteFavorite, Favorite, FavoriteKind } from './services/favoritesService';
 import { AppState, HybridRoute, LDTResult, Place } from './types';
 import CostChart from './components/CostChart';
 import RouteCardCountdown from './components/RouteCardCountdown';
@@ -152,7 +154,7 @@ const App: React.FC = () => {
   const [error, setError] = useState('');
   
   // Postcode Modal State
-  const [postcodeTarget, setPostcodeTarget] = useState<'start' | 'end' | 'home' | null>(null);
+  const [postcodeTarget, setPostcodeTarget] = useState<'start' | 'end' | 'home' | 'favorite' | null>(null);
   
   // Notice Detail State
   const [selectedNotice, setSelectedNotice] = useState<any | null>(null);
@@ -233,6 +235,15 @@ const App: React.FC = () => {
   const [tempPhone, setTempPhone] = useState('');
   const [walkPreference, setWalkPreference] = useState<'SHORT' | 'CHEAP'>('CHEAP');
 
+  // 즐겨찾기 State (Supabase)
+  const [favorites, setFavorites] = useState<Favorite[]>([]);
+  const [showFavoritesSheet, setShowFavoritesSheet] = useState(false);
+  const [favoritesLoading, setFavoritesLoading] = useState(false);
+  const [favoriteForm, setFavoriteForm] = useState<Favorite | 'new' | null>(null);
+  const [favoriteFormLabel, setFavoriteFormLabel] = useState('');
+  const [favoriteFormAddress, setFavoriteFormAddress] = useState('');
+  const [favoriteFormKind, setFavoriteFormKind] = useState<FavoriteKind>('CUSTOM');
+
   // 피커 모달 열릴 때 현재 선택값으로 스크롤
   useEffect(() => {
     if (!filterModalType || !pickerScrollRef.current) return;
@@ -261,6 +272,11 @@ const App: React.FC = () => {
   useEffect(() => {
     setSplashMessage(SPLASH_MESSAGES[Math.floor(Math.random() * SPLASH_MESSAGES.length)]);
     track('visit');
+
+    // 즐겨찾기용 익명 세션 확보 → 성공하면 즐겨찾기 프리로드 (fire-and-forget, splash를 막지 않음)
+    ensureAnonymousSession().then(uid => {
+      if (uid) listFavorites().then(setFavorites).catch(() => {});
+    });
 
     const timer = setTimeout(() => {
       setShowSplash(false);
@@ -685,7 +701,47 @@ const App: React.FC = () => {
       setEmergencyPhone(tempPhone);
       setIsEditingPhone(false);
   };
-  
+
+  const openFavoriteForm = (target: Favorite | 'new') => {
+      setFavoriteForm(target);
+      if (target === 'new') {
+          setFavoriteFormLabel('');
+          setFavoriteFormAddress('');
+          setFavoriteFormKind('CUSTOM');
+      } else {
+          setFavoriteFormLabel(target.label);
+          setFavoriteFormAddress(target.address);
+          setFavoriteFormKind(target.kind);
+      }
+  };
+
+  const saveFavoriteForm = async () => {
+      if (!favoriteFormLabel.trim() || !favoriteFormAddress.trim()) return;
+
+      if (favoriteForm === 'new') {
+          // HOME/WORK는 유저당 1개 제한 — 이미 있으면 새로 추가하지 않고 기존 걸 수정
+          const existing = favoriteFormKind !== 'CUSTOM'
+              ? favorites.find(f => f.kind === favoriteFormKind)
+              : undefined;
+          if (existing) {
+              const updated = await updateFavorite(existing.id, { label: favoriteFormLabel, address: favoriteFormAddress });
+              if (updated) setFavorites(prev => prev.map(f => f.id === updated.id ? updated : f));
+          } else {
+              const created = await addFavorite({ label: favoriteFormLabel, address: favoriteFormAddress, kind: favoriteFormKind });
+              if (created) setFavorites(prev => [...prev, created]);
+          }
+      } else if (favoriteForm) {
+          const updated = await updateFavorite(favoriteForm.id, { label: favoriteFormLabel, address: favoriteFormAddress });
+          if (updated) setFavorites(prev => prev.map(f => f.id === updated.id ? updated : f));
+      }
+      setFavoriteForm(null);
+  };
+
+  const removeFavorite = async (id: string) => {
+      const ok = await deleteFavorite(id);
+      if (ok) setFavorites(prev => prev.filter(f => f.id !== id));
+  };
+
   const saveNickname = () => {
       if (tempNickname.trim()) setNickname(tempNickname);
       if (tempProfileImage) setProfileImage(tempProfileImage);
@@ -822,6 +878,26 @@ const App: React.FC = () => {
                 {homeAddress ? `우리 집으로 슝~` : '우리 집 등록하고 편하게 가기!'}
              </button>
 
+            {favorites.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-1 mb-4 -mt-2">
+                {favorites.map(fav => (
+                  <button
+                    key={fav.id}
+                    onClick={() => requireLogin(() => {
+                      setEndLoc(fav.address);
+                      if (fav.lat != null && fav.lon != null) {
+                        setCachedCoordinates(fav.address, { lat: fav.lat, lon: fav.lon });
+                      }
+                    })}
+                    className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full bg-amber-50 text-amber-600 text-xs font-bold border border-amber-100 active:scale-95 transition-all"
+                  >
+                    <Star size={12} />
+                    {fav.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <button
                 onClick={() => requireLogin(handleSearch)}
                 disabled={isLoading}
@@ -856,6 +932,7 @@ const App: React.FC = () => {
                             if (postcodeTarget === 'start') setStartLoc(data.address);
                             if (postcodeTarget === 'end') setEndLoc(data.address);
                             if (postcodeTarget === 'home') setTempHomeAddress(data.address);
+                            if (postcodeTarget === 'favorite') setFavoriteFormAddress(data.address);
                             setPostcodeTarget(null);
                         }}
                         autoClose={false}
@@ -1251,6 +1328,25 @@ const App: React.FC = () => {
 
                     <div className="mx-5 h-px bg-gray-50" />
 
+                    {/* 즐겨찾기 관리 */}
+                    <button
+                        onClick={() => setShowFavoritesSheet(true)}
+                        className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors active:bg-gray-100"
+                    >
+                        <div className="w-10 h-10 rounded-2xl bg-amber-50 flex items-center justify-center shrink-0">
+                            <Star size={18} className="text-brandYellow" />
+                        </div>
+                        <div className="flex-1 text-left min-w-0">
+                            <p className="font-bold text-gray-800 text-sm">즐겨찾기 관리</p>
+                            <p className="text-xs text-gray-400 truncate mt-0.5">
+                                {favorites.length > 0 ? `${favorites.length}개 저장됨` : '자주 가는 곳을 저장해보세요 ⭐'}
+                            </p>
+                        </div>
+                        <ChevronRight size={16} className="text-gray-300 shrink-0" />
+                    </button>
+
+                    <div className="mx-5 h-px bg-gray-50" />
+
                     {/* 이동 취향 */}
                     <button
                         onClick={() => setWalkPreference(walkPreference === 'CHEAP' ? 'SHORT' : 'CHEAP')}
@@ -1567,6 +1663,108 @@ const App: React.FC = () => {
             </div>
         )}
 
+        {/* 즐겨찾기 관리 바텀시트 */}
+        {showFavoritesSheet && (
+            <div className="absolute inset-0 z-[60] bg-black/60 flex items-end backdrop-blur-sm">
+                <div className="bg-white w-full rounded-t-[2rem] p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
+                    <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
+
+                    {!favoriteForm ? (
+                        <>
+                            <div className="flex items-center justify-between mb-1">
+                                <p className="text-lg font-black text-gray-800">즐겨찾기 관리</p>
+                                <button onClick={() => setShowFavoritesSheet(false)} className="p-1 hover:bg-gray-100 rounded-full">
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            <p className="text-sm text-gray-400 mb-4">자주 가는 곳을 저장하면 검색 화면에서 한 번에 골라 쓸 수 있어요 ⭐</p>
+
+                            {favoritesLoading ? (
+                                <p className="text-center text-sm text-gray-400 py-8">불러오는 중...</p>
+                            ) : favorites.length === 0 ? (
+                                <p className="text-center text-sm text-gray-400 py-8">아직 등록된 즐겨찾기가 없어요</p>
+                            ) : (
+                                <div className="space-y-2 mb-4">
+                                    {favorites.map(fav => (
+                                        <div key={fav.id} className="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3">
+                                            <Star size={16} className="text-brandYellow shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-bold text-gray-800 text-sm">{fav.label}</p>
+                                                <p className="text-xs text-gray-400 truncate">{fav.address}</p>
+                                            </div>
+                                            <button onClick={() => openFavoriteForm(fav)} className="p-2 hover:bg-gray-100 rounded-full shrink-0">
+                                                <Edit2 size={15} className="text-gray-400" />
+                                            </button>
+                                            <button onClick={() => removeFavorite(fav.id)} className="p-2 hover:bg-gray-100 rounded-full shrink-0">
+                                                <Trash2 size={15} className="text-brandPink" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <button
+                                onClick={() => openFavoriteForm('new')}
+                                className="w-full py-3 rounded-2xl text-sm border-2 border-dashed border-gray-200 text-gray-500 font-bold flex items-center justify-center gap-2 hover:bg-gray-50"
+                            >
+                                <Plus size={16} />
+                                즐겨찾기 추가
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <p className="text-lg font-black text-gray-800 mb-1">
+                                {favoriteForm === 'new' ? '즐겨찾기 추가' : '즐겨찾기 수정'}
+                            </p>
+                            <p className="text-sm text-gray-400 mb-4">이름과 주소를 입력해주세요</p>
+
+                            <div className="flex gap-2 mb-4">
+                                {(['HOME', 'WORK', 'CUSTOM'] as FavoriteKind[]).map(kind => (
+                                    <button
+                                        key={kind}
+                                        onClick={() => setFavoriteFormKind(kind)}
+                                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${favoriteFormKind === kind ? 'bg-brandBlue text-white' : 'bg-gray-100 text-gray-500'}`}
+                                    >
+                                        {kind === 'HOME' ? '집' : kind === 'WORK' ? '회사' : '커스텀'}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <input
+                                type="text"
+                                value={favoriteFormLabel}
+                                onChange={(e) => setFavoriteFormLabel(e.target.value)}
+                                placeholder="예: 집, 회사, 헬스장"
+                                className="w-full bg-gray-50 border-2 border-transparent focus:border-brandBlue rounded-2xl px-5 py-4 mb-3 focus:outline-none font-bold"
+                            />
+
+                            <div className="relative mb-4">
+                                <input
+                                    type="text"
+                                    value={favoriteFormAddress}
+                                    onChange={(e) => setFavoriteFormAddress(e.target.value)}
+                                    placeholder="예: 서울 강남구 강남대로 123"
+                                    className="w-full bg-gray-50 border-2 border-transparent focus:border-brandBlue rounded-2xl px-5 py-4 pr-[7.5rem] focus:outline-none font-bold"
+                                />
+                                <button
+                                    onClick={() => setPostcodeTarget('favorite')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 bg-brandBlue text-white text-xs font-black px-3 py-2 rounded-xl shadow-sm active:scale-95 transition-transform"
+                                >
+                                    <Search size={13} />
+                                    주소 검색
+                                </button>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button onClick={() => setFavoriteForm(null)} className="flex-1 py-4 text-gray-500 bg-gray-100 rounded-2xl font-bold">취소</button>
+                                <button onClick={saveFavoriteForm} className="flex-1 py-4 text-white bg-brandBlue rounded-2xl font-black shadow-md shadow-blue-200">저장</button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+        )}
+
         {/* 비상 연락처 편집 모달 */}
         {isEditingPhone && (
             <div className="absolute inset-0 z-[60] bg-black/60 flex items-end backdrop-blur-sm">
@@ -1591,7 +1789,7 @@ const App: React.FC = () => {
         )}
 
         {/* 주소 검색 팝업 (MY_PAGE) */}
-        {postcodeTarget === 'home' && (
+        {(postcodeTarget === 'home' || postcodeTarget === 'favorite') && (
             <div className="absolute inset-0 z-[70] bg-black/60 flex items-center justify-center p-4 backdrop-blur-md">
                 <div className="bg-white w-full max-w-md rounded-2xl overflow-hidden shadow-2xl relative">
                     <div className="flex justify-between items-center p-4 border-b">
@@ -1603,9 +1801,13 @@ const App: React.FC = () => {
                     <div className="h-[400px] overflow-y-auto">
                         <DaumPostcode
                             onComplete={(data) => {
-                                setTempHomeAddress(data.address);
+                                if (postcodeTarget === 'home') {
+                                    setTempHomeAddress(data.address);
+                                    setIsEditingHome(true);
+                                } else if (postcodeTarget === 'favorite') {
+                                    setFavoriteFormAddress(data.address);
+                                }
                                 setPostcodeTarget(null);
-                                setIsEditingHome(true);
                             }}
                             autoClose={false}
                         />
