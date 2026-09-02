@@ -259,12 +259,39 @@ export default defineConfig(({ mode }) => {
                             const params = new URLSearchParams(url.split('?')[1] || '');
                             const stationName = params.get('stationName') || '';
                             const routeNo = params.get('routeNo') || '';
+                            const routeOnly = params.get('routeOnly') || '';
                             const toSeoulItems = (data: any): any[] => {
                                 // JSON 응답은 XML과 달리 ServiceResult 래퍼가 없음
                                 const items = data?.msgBody?.itemList ?? data?.ServiceResult?.msgBody?.itemList;
                                 if (!items) return [];
                                 return Array.isArray(items) ? items : [items];
                             };
+
+                            // 정류소 없이 노선 자체의 첫차/막차 시각만 필요할 때 (시각 지정 경로 검증용)
+                            if (routeOnly && routeNo) {
+                                try {
+                                    const routeUrl = `${SEOUL_BUS_BASE}/busRouteInfo/getBusRouteList?serviceKey=${SEOUL_BUS_KEY}&strSrch=${encodeURIComponent(routeNo)}&resultType=json`;
+                                    const routeRes = await fetch(routeUrl);
+                                    const routeData = await routeRes.json();
+                                    const routes = toSeoulItems(routeData);
+                                    const candidates = routes.filter((r: any) => r.busRouteAbrv === routeNo || r.busRouteNm === routeNo);
+                                    const route = candidates[0] || routes[0];
+                                    res.setHeader('Content-Type', 'application/json');
+                                    if (!route) { res.end(JSON.stringify({ found: false })); return; }
+                                    res.end(JSON.stringify({
+                                        found: true,
+                                        busRouteId: route.busRouteId,
+                                        firstBusTm: route.firstBusTm || '',
+                                        lastBusTm: route.lastBusTm || '',
+                                        routeType: route.routeType || '',
+                                    }));
+                                } catch (e: any) {
+                                    res.setHeader('Content-Type', 'application/json');
+                                    res.end(JSON.stringify({ found: false, error: e.message }));
+                                }
+                                return;
+                            }
+
                             try {
                                 // 1. 정류소명 → arsId
                                 const stUrl = `${SEOUL_BUS_BASE}/stationinfo/getStationByName?serviceKey=${SEOUL_BUS_KEY}&stSrch=${encodeURIComponent(stationName)}&resultType=json`;

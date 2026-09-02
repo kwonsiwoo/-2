@@ -25,7 +25,29 @@ const fetchJson = async (url: string) => {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const { stationName, routeNo } = req.query as Record<string, string>;
+  const { stationName, routeNo, routeOnly } = req.query as Record<string, string>;
+
+  // 정류소 없이 노선 자체의 첫차/막차 시각만 필요할 때 (시각 지정 경로 검증용)
+  if (routeOnly && routeNo) {
+    try {
+      const routeData = await fetchJson(
+        `${BASE}/busRouteInfo/getBusRouteList?serviceKey=${ROUTE_KEY}&strSrch=${encodeURIComponent(routeNo)}&resultType=json`
+      );
+      const routes = toItems(routeData);
+      const candidates = routes.filter((r: any) => r.busRouteAbrv === routeNo || r.busRouteNm === routeNo);
+      const route = candidates[0] || routes[0];
+      if (!route) return res.json({ found: false });
+      return res.json({
+        found: true,
+        busRouteId: route.busRouteId,
+        firstBusTm: route.firstBusTm || '',
+        lastBusTm: route.lastBusTm || '',
+        routeType: route.routeType || '',
+      });
+    } catch (e: any) {
+      return res.json({ found: false, error: e.message });
+    }
+  }
 
   try {
     // 1. 정류소명 → stId(9자리 고유ID) + arsId(5자리 안내번호)

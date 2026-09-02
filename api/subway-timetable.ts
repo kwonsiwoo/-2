@@ -57,6 +57,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         '| uData:', JSON.stringify(uData).slice(0, 150));
     }
 
+    // 운행일 기준(04:00~다음날 04:00) 분으로 변환 — 00~03시대는 전날 심야의 연장으로 취급
+    const toServiceMin = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return (h < 4 ? h + 24 : h) * 60 + m;
+    };
+    // "now"와 무관하게, 그날 시간표상 실제 첫차/막차 시각 — LDT/시각 지정 검색 검증용
+    const edgeTrain = (rows: any[], pick: 'first' | 'last') => {
+      if (rows.length === 0) return null;
+      let best: { t: string; m: number } | null = null;
+      for (const r of rows) {
+        const t = (r.ARRIVETIME || r.DEPARTURETIME || '').slice(0, 5);
+        if (!t) continue;
+        const m = toServiceMin(t);
+        if (!best || (pick === 'first' ? m < best.m : m > best.m)) best = { t, m };
+      }
+      return best?.t ?? null;
+    };
+
     const all = [
       ...uRows.map((r: any) => ({ ...r, _dir: 'U' })),
       ...dRows.map((r: any) => ({ ...r, _dir: 'D' })),
@@ -85,6 +103,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const uResult = uData?.RESULT || uData?.SearchSTNTimeTableByIDService?.RESULT;
     return res.json({
       trains: all,
+      // 그날 시간표상 첫차/막차 — 시각 지정 경로 검색 시 운행 여부 검증용 ("HH:MM" 또는 null)
+      firstTrain: { U: edgeTrain(uRows, 'first'), D: edgeTrain(dRows, 'first') },
+      lastTrain: { U: edgeTrain(uRows, 'last'), D: edgeTrain(dRows, 'last') },
       _debug: {
         uRows: uRows.length,
         dRows: dRows.length,
