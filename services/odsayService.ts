@@ -200,7 +200,7 @@ function kakaoRouteToOdsayPath(
 async function fetchKakaoTransitPaths(
   startLat: number, startLon: number, endLat: number, endLon: number,
 ): Promise<any[]> {
-  const url = `/api/kakao-transit?start_x=${startLon}&start_y=${startLat}&end_x=${endLon}&end_y=${endLat}`;
+  const url = `/api/kakao-local?type=transit&start_x=${startLon}&start_y=${startLat}&end_x=${endLon}&end_y=${endLat}`;
   const res = await fetch(url);
   const data = await res.json();
   if (data.status !== 'OK' || !data.routes?.length) {

@@ -308,138 +308,63 @@ export default defineConfig(({ mode }) => {
                             return;
                         }
 
-                        // 카카오 로컬 API 프록시
+                        // 카카오 API 통합 프록시 (Vercel Hobby 플랜 서버리스 함수 12개 제한 때문에
+                        // kakao-local/transit/directions/walk를 파일 하나로 합쳐서 씀 — type 파라미터로 분기)
                         if (url.startsWith('/api/kakao-local')) {
                             const params = new URLSearchParams(url.split('?')[1] || '');
                             const type = params.get('type') || '';
-                            const KAKAO_ENDPOINTS: Record<string, string> = {
-                                address: '/search/address.json',
-                                keyword: '/search/keyword.json',
-                                coord2address: '/geo/coord2address.json',
-                                coord2regioncode: '/geo/coord2regioncode.json',
-                            };
                             if (!KAKAO_REST_KEY) {
                                 res.statusCode = 500;
                                 res.setHeader('Content-Type', 'application/json');
                                 res.end(JSON.stringify({ error: 'KAKAO_REST_API_KEY 환경변수가 설정되지 않았습니다' }));
                                 return;
                             }
-                            const kakaoPath = KAKAO_ENDPOINTS[type];
-                            if (!kakaoPath) {
-                                res.statusCode = 400;
-                                res.setHeader('Content-Type', 'application/json');
-                                res.end(JSON.stringify({ error: `알 수 없는 type: ${type}` }));
-                                return;
-                            }
-                            params.delete('type');
-                            try {
-                                const r = await fetch(`${KAKAO_LOCAL_BASE}${kakaoPath}?${params.toString()}`, {
-                                    headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` },
-                                });
-                                const data = await r.json();
-                                res.statusCode = r.status;
-                                res.setHeader('Content-Type', 'application/json');
-                                res.end(JSON.stringify(data));
-                            } catch (e: any) {
-                                res.statusCode = 500;
-                                res.setHeader('Content-Type', 'application/json');
-                                res.end(JSON.stringify({ error: e.message }));
-                            }
-                            return;
-                        }
 
-                        // 카카오모빌리티 자동차 길찾기 프록시 (택시/드라이빙 구간 실제 도로 경로용)
-                        if (url.startsWith('/api/kakao-directions')) {
-                            const params = new URLSearchParams(url.split('?')[1] || '');
-                            const origin = params.get('origin') || '';
-                            const destination = params.get('destination') || '';
-                            if (!KAKAO_REST_KEY) {
-                                res.statusCode = 500;
-                                res.setHeader('Content-Type', 'application/json');
-                                res.end(JSON.stringify({ error: 'KAKAO_REST_API_KEY 환경변수가 설정되지 않았습니다' }));
-                                return;
-                            }
-                            if (!origin || !destination) {
-                                res.statusCode = 400;
-                                res.setHeader('Content-Type', 'application/json');
-                                res.end(JSON.stringify({ error: 'origin, destination이 필요합니다' }));
-                                return;
-                            }
-                            try {
+                            let targetUrl = '';
+                            if (type === 'transit' || type === 'walk') {
+                                const start_x = params.get('start_x') || '';
+                                const start_y = params.get('start_y') || '';
+                                const end_x = params.get('end_x') || '';
+                                const end_y = params.get('end_y') || '';
+                                if (!start_x || !start_y || !end_x || !end_y) {
+                                    res.statusCode = 400;
+                                    res.setHeader('Content-Type', 'application/json');
+                                    res.end(JSON.stringify({ error: 'start_x, start_y, end_x, end_y가 필요합니다' }));
+                                    return;
+                                }
+                                const qs = new URLSearchParams({ start_x, start_y, end_x, end_y, input_coord: 'WGS84' }).toString();
+                                targetUrl = `${type === 'transit' ? KAKAO_TRANSIT_BASE : KAKAO_WALK_BASE}?${qs}`;
+                            } else if (type === 'directions') {
+                                const origin = params.get('origin') || '';
+                                const destination = params.get('destination') || '';
+                                if (!origin || !destination) {
+                                    res.statusCode = 400;
+                                    res.setHeader('Content-Type', 'application/json');
+                                    res.end(JSON.stringify({ error: 'origin, destination이 필요합니다' }));
+                                    return;
+                                }
                                 const qs = new URLSearchParams({ origin, destination }).toString();
-                                const r = await fetch(`${KAKAO_DIRECTIONS_BASE}?${qs}`, {
-                                    headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` },
-                                });
-                                const data = await r.json();
-                                res.statusCode = r.status;
-                                res.setHeader('Content-Type', 'application/json');
-                                res.end(JSON.stringify(data));
-                            } catch (e: any) {
-                                res.statusCode = 500;
-                                res.setHeader('Content-Type', 'application/json');
-                                res.end(JSON.stringify({ error: e.message }));
+                                targetUrl = `${KAKAO_DIRECTIONS_BASE}?${qs}`;
+                            } else {
+                                const KAKAO_ENDPOINTS: Record<string, string> = {
+                                    address: '/search/address.json',
+                                    keyword: '/search/keyword.json',
+                                    coord2address: '/geo/coord2address.json',
+                                    coord2regioncode: '/geo/coord2regioncode.json',
+                                };
+                                const kakaoPath = KAKAO_ENDPOINTS[type];
+                                if (!kakaoPath) {
+                                    res.statusCode = 400;
+                                    res.setHeader('Content-Type', 'application/json');
+                                    res.end(JSON.stringify({ error: `알 수 없는 type: ${type}` }));
+                                    return;
+                                }
+                                params.delete('type');
+                                targetUrl = `${KAKAO_LOCAL_BASE}${kakaoPath}?${params.toString()}`;
                             }
-                            return;
-                        }
 
-                        // 카카오맵 도보 길찾기 프록시 (도보 구간 실제 보행 경로용)
-                        if (url.startsWith('/api/kakao-walk')) {
-                            const params = new URLSearchParams(url.split('?')[1] || '');
-                            const start_x = params.get('start_x') || '';
-                            const start_y = params.get('start_y') || '';
-                            const end_x = params.get('end_x') || '';
-                            const end_y = params.get('end_y') || '';
-                            if (!KAKAO_REST_KEY) {
-                                res.statusCode = 500;
-                                res.setHeader('Content-Type', 'application/json');
-                                res.end(JSON.stringify({ error: 'KAKAO_REST_API_KEY 환경변수가 설정되지 않았습니다' }));
-                                return;
-                            }
-                            if (!start_x || !start_y || !end_x || !end_y) {
-                                res.statusCode = 400;
-                                res.setHeader('Content-Type', 'application/json');
-                                res.end(JSON.stringify({ error: 'start_x, start_y, end_x, end_y가 필요합니다' }));
-                                return;
-                            }
                             try {
-                                const qs = new URLSearchParams({ start_x, start_y, end_x, end_y, input_coord: 'WGS84' }).toString();
-                                const r = await fetch(`${KAKAO_WALK_BASE}?${qs}`, {
-                                    headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` },
-                                });
-                                const data = await r.json();
-                                res.statusCode = r.status;
-                                res.setHeader('Content-Type', 'application/json');
-                                res.end(JSON.stringify(data));
-                            } catch (e: any) {
-                                res.statusCode = 500;
-                                res.setHeader('Content-Type', 'application/json');
-                                res.end(JSON.stringify({ error: e.message }));
-                            }
-                            return;
-                        }
-
-                        // 카카오 대중교통 길찾기 프록시 (ODsay 쿼터 초과 시 폴백)
-                        if (url.startsWith('/api/kakao-transit')) {
-                            const params = new URLSearchParams(url.split('?')[1] || '');
-                            const start_x = params.get('start_x') || '';
-                            const start_y = params.get('start_y') || '';
-                            const end_x = params.get('end_x') || '';
-                            const end_y = params.get('end_y') || '';
-                            if (!KAKAO_REST_KEY) {
-                                res.statusCode = 500;
-                                res.setHeader('Content-Type', 'application/json');
-                                res.end(JSON.stringify({ error: 'KAKAO_REST_API_KEY 환경변수가 설정되지 않았습니다' }));
-                                return;
-                            }
-                            if (!start_x || !start_y || !end_x || !end_y) {
-                                res.statusCode = 400;
-                                res.setHeader('Content-Type', 'application/json');
-                                res.end(JSON.stringify({ error: 'start_x, start_y, end_x, end_y가 필요합니다' }));
-                                return;
-                            }
-                            try {
-                                const qs = new URLSearchParams({ start_x, start_y, end_x, end_y, input_coord: 'WGS84' }).toString();
-                                const r = await fetch(`${KAKAO_TRANSIT_BASE}?${qs}`, {
+                                const r = await fetch(targetUrl, {
                                     headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` },
                                 });
                                 const data = await r.json();

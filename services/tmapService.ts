@@ -259,7 +259,7 @@ async function fetchDrivingRoute(
     try {
         const origin = `${startLon},${startLat}`;
         const destination = `${endLon},${endLat}`;
-        const res = await fetch(`/api/kakao-directions?origin=${origin}&destination=${destination}`);
+        const res = await fetch(`/api/kakao-local?type=directions&origin=${origin}&destination=${destination}`);
         const data = await res.json();
         const route = data.routes?.[0];
         if (route?.result_code === 0) {
@@ -318,7 +318,7 @@ async function fetchWalkingRoute(
     if (walkingCache.has(key)) return walkingCache.get(key)!;
 
     try {
-        const res = await fetch(`/api/kakao-walk?start_x=${startLon}&start_y=${startLat}&end_x=${endLon}&end_y=${endLat}`);
+        const res = await fetch(`/api/kakao-local?type=walk&start_x=${startLon}&start_y=${startLat}&end_x=${endLon}&end_y=${endLat}`);
         const data = await res.json();
         if (data.status === 'OK' && data.route?.legs?.length) {
             const path: { lat: number; lng: number }[] = [];
