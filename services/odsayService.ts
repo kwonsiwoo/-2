@@ -878,16 +878,16 @@ export const getOdsayTransitRoutes = async (
 
   let paths: any[];
   if (departureDate) {
-    const validPaths: any[] = [];
-    for (const p of allPaths) {
+    // 시간표 검증(isPathRunnable)이 실제 외부 API를 호출하므로, 경로별로 순차 대기하면
+    // 카카오가 준 후보가 많을 때(10개 이상) 검색 하나에 수 초씩 걸림 — 전부 병렬로 처리
+    const runnableFlags = await Promise.all(allPaths.map(async (p) => {
       const totalTime: number = p.info?.totalTime ?? 9999;
-      if (totalTime > 240) continue;
+      if (totalTime > 240) return false;
       const sectionTime: number = (p.subPath || []).reduce((s: number, sp: any) => s + (sp.sectionTime || 0), 0);
-      if ((totalTime - sectionTime) > 30) continue;
-      if (!(await isPathRunnable(p, departureDate))) continue;
-      validPaths.push(p);
-    }
-    paths = validPaths;
+      if ((totalTime - sectionTime) > 30) return false;
+      return isPathRunnable(p, departureDate);
+    }));
+    paths = allPaths.filter((_, i) => runnableFlags[i]);
   } else {
     paths = allPaths;
   }

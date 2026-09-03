@@ -188,9 +188,9 @@ export async function isSubPathRunnable(sp: any, date: Date): Promise<boolean> {
 
 /** 하나의 경로(path)가 주어진 시각에 완주 가능한지 확인 */
 export async function isPathRunnable(path: any, departureDate: Date): Promise<boolean> {
-  for (const sp of (path.subPath || [])) {
-    const runnable = await isSubPathRunnable(sp, departureDate);
-    if (!runnable) return false;
-  }
-  return true;
+  // 구간별 검증이 외부 API를 호출하므로 순차 대기 대신 병렬로 처리
+  const flags = await Promise.all(
+    (path.subPath || []).map((sp: any) => isSubPathRunnable(sp, departureDate))
+  );
+  return flags.every(Boolean);
 }
